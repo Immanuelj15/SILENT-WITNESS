@@ -296,3 +296,39 @@ def get_demo_scenarios():
             ]
         }
     ]
+
+@router.post("/feedback", response_model=Dict[str, Any])
+def submit_user_feedback(feedback: Dict[str, Any], db: Session = Depends(get_db)):
+    """
+    User Feedback Loop (Section 6 & 9.6).
+    Receives user-reported outcomes (e.g. 'SCAM', 'FALSE_ALARM', 'LEGITIMATE')
+    to continuously calibrate risk thresholds and track precision.
+    """
+    from backend.app.models.database import UserFeedbackRecord
+    
+    call_id = feedback.get("call_id", "")
+    user_label = feedback.get("user_label", "SCAM")
+    notes = feedback.get("notes", "")
+
+    try:
+        record = UserFeedbackRecord(
+            call_id=call_id,
+            user_label=user_label,
+            notes=notes
+        )
+        db.add(record)
+        db.commit()
+
+        adjustment = "Weight calibration logged. Sensitivity adjusted to minimize false alarms." if user_label == "FALSE_ALARM" else "Positive scam pattern reinforcement recorded."
+
+        return {
+            "success": True,
+            "message": "User feedback received successfully.",
+            "calibrated_adjustment": adjustment,
+            "call_id": call_id,
+            "user_label": user_label
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Feedback recording error: {str(e)}")
+

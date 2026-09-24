@@ -77,6 +77,11 @@ class DeterministicRiskEngine:
         elif has_otp_demand:
             weighted_risk = max(weighted_risk, 75.0)
 
+        # Extortion / Digital Arrest / Law Enforcement Intimidation Override
+        has_extortion_threat = any("arrest" in e.exact_phrase.lower() or "digital arrest" in e.exact_phrase.lower() for e in evidence_items)
+        if has_extortion_threat and (t_score >= 40.0 or id_score >= 60.0):
+            weighted_risk = max(weighted_risk, 82.0)
+
         final_risk = int(round(max(0.0, min(100.0, weighted_risk))))
         trust_score = max(0, 100 - final_risk)
 

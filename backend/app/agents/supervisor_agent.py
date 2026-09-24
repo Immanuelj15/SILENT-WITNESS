@@ -13,11 +13,14 @@ from backend.app.models.schemas import (
 )
 from backend.app.core.security import detect_prompt_injection_attempt
 
+from backend.app.transcription.diarization import SpeakerDiarizer
+from backend.app.risk.attribution import AttributionEngine
+
 class SupervisorAgent:
     """
     Supervisor Agent: Coordinates Scam, Intent, Identity, and Evidence agents.
     Synthesizes findings, surfaces agent disagreements, passes verified claims to the
-    deterministic risk engine, and categorizes scams.
+    deterministic risk engine, generates speaker diarization, and calculates SHAP/feature attributions.
     """
 
     def __init__(self):
@@ -26,6 +29,8 @@ class SupervisorAgent:
         self.identity_agent = IdentityAgent()
         self.evidence_agent = EvidenceAgent()
         self.risk_engine = DeterministicRiskEngine()
+        self.diarizer = SpeakerDiarizer()
+        self.attribution_engine = AttributionEngine()
 
     def determine_category(
         self,
@@ -182,6 +187,29 @@ class SupervisorAgent:
             disagreements=disagreements
         )
 
+        # Compute Section 3.B Speaker Diarization Turns
+        diarized_turns = [t.model_dump() for t in self.diarizer.segment_transcript_into_turns(transcript)]
+
+        # Compute Section 3.F & 7 Feature Attributions and Severity Tier
+        attributions = [a.model_dump() for a in self.attribution_engine.compute_attributions(
+            evidence_items=grounded_evidence,
+            demands=intent_res["demands"],
+            tactics=scam_res["detected_tactics"],
+            claimed_identity=identity_res["claimed_identity"],
+            voice_risk=voice_risk,
+            is_synthetic=(voice_result.is_synthetic_suspected if voice_result else False)
+        )]
+
+        severity_tier = self.attribution_engine.get_severity_tier(trust_score)
+
+        timeline_point = {
+            "timestamp_sec": round(len(transcript.split()) * 0.4, 1),
+            "trust_score": trust_score,
+            "severity_tier": severity_tier["tier"],
+            "primary_event": risk_factors[0] if risk_factors else "Normal Dialogue",
+            "active_deductions": attributions
+        }
+
         return AnalysisResult(
             classification=classification,
             riskScore=risk_score,
@@ -199,5 +227,9 @@ class SupervisorAgent:
             aiExplanation=explanation,
             voiceAnalysis=voice_result,
             subScores=breakdown,
-            agentReport=agent_report
+            agentReport=agent_report,
+            dialogueTurns=diarized_turns,
+            attributions=attributions,
+            severityTier=severity_tier,
+            timeline=[timeline_point]
         )

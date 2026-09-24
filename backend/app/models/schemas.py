@@ -66,6 +66,10 @@ class AnalysisResult(BaseModel):
     voiceAnalysis: Optional[VoiceAnalysisResult] = None
     subScores: Optional[RiskBreakdown] = None
     agentReport: Optional[AgentAnalysisReport] = None
+    dialogueTurns: List[Dict[str, Any]] = Field(default_factory=list)
+    attributions: List[Dict[str, Any]] = Field(default_factory=list)
+    severityTier: Dict[str, str] = Field(default_factory=dict)
+    timeline: List[Dict[str, Any]] = Field(default_factory=list)
     latency_ms: Optional[float] = None
     created_at: Optional[str] = None
 
@@ -92,3 +96,15 @@ class CallSessionSummary(BaseModel):
     category: str
     duration_sec: float
     snippet: str
+
+class UserFeedbackRequest(BaseModel):
+    call_id: str
+    user_label: str  # "SCAM", "LEGITIMATE", "FALSE_ALARM"
+    notes: Optional[str] = None
+    reported_missed_signals: List[str] = Field(default_factory=list)
+
+class UserFeedbackResponse(BaseModel):
+    success: bool
+    message: str
+    calibrated_adjustment: str
+

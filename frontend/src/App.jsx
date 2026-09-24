@@ -9,13 +9,16 @@ import DemoWalkthrough from './components/DemoWalkthrough';
 import AudioAnalyzer from './components/AudioAnalyzer';
 import HistoryDashboard from './components/HistoryDashboard';
 import MobileCallModal from './components/MobileCallModal';
-import { Mic, MicOff, Send, Radio, Sparkles, AlertCircle, RefreshCw } from 'lucide-react';
+import FeatureAttributionDrawer from './components/FeatureAttributionDrawer';
+import UserFeedbackModal from './components/UserFeedbackModal';
+import { Mic, MicOff, Send, Radio, Sparkles, AlertCircle, RefreshCw, MessageSquarePlus } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('live');
   const [easyMode, setEasyMode] = useState(false);
   const [language, setLanguage] = useState('en');
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   // Live Call Streaming State
   const [isRecording, setIsRecording] = useState(false);
@@ -242,6 +245,14 @@ export default function App() {
                     <MicOff size={18} /> STOP MONITORING
                   </button>
                 )}
+                <button
+                  onClick={() => setIsFeedbackModalOpen(true)}
+                  className="btn-secondary"
+                  style={{ padding: '12px 16px', fontSize: '0.85rem' }}
+                  title="Submit accuracy calibration feedback"
+                >
+                  <MessageSquarePlus size={16} /> Calibrate / Feedback
+                </button>
               </div>
             </div>
 
@@ -254,6 +265,12 @@ export default function App() {
                   riskScore={currentAnalysis.riskScore}
                   confidence={currentAnalysis.confidence}
                   isProvisional={isProvisional}
+                  easyMode={easyMode}
+                />
+
+                <FeatureAttributionDrawer
+                  attributions={currentAnalysis.attributions}
+                  severityTier={currentAnalysis.severityTier}
                   easyMode={easyMode}
                 />
 
@@ -277,6 +294,7 @@ export default function App() {
 
                 <LiveTranscript
                   transcript={liveTranscript || currentAnalysis.transcript}
+                  dialogueTurns={currentAnalysis.dialogueTurns}
                   evidence={currentAnalysis.evidence}
                   suspiciousPhrases={currentAnalysis.suspiciousPhrases}
                   isProvisional={isProvisional}
@@ -430,6 +448,13 @@ export default function App() {
         onClose={() => setIsMobileModalOpen(false)}
         analysis={currentAnalysis}
         onEndCall={handleStopLiveCall}
+      />
+
+      {/* User Feedback Loop Modal */}
+      <UserFeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        callId={currentAnalysis.id}
       />
     </div>
   );

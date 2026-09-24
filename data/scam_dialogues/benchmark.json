@@ -1,0 +1,50 @@
+[
+  {
+    "id": "bank_otp_01",
+    "is_scam": true,
+    "ground_truth_category": "Banking Scam",
+    "transcript": "Hello, I am calling from State Bank. Your account has an urgent verification flag and will be blocked today. Please share the OTP sent to your phone immediately to verify.",
+    "warning_turn_index": 2,
+    "warning_offset_sec": 4.5
+  },
+  {
+    "id": "digital_arrest_02",
+    "is_scam": true,
+    "ground_truth_category": "Police/Legal Threat Scam",
+    "transcript": "This is Inspector Sharma from Crime Branch Delhi. A package with illegal drugs in your name was seized by customs. You are under digital arrest right now. Do not hang up.",
+    "warning_turn_index": 1,
+    "warning_offset_sec": 3.0
+  },
+  {
+    "id": "upi_qr_inversion_03",
+    "is_scam": true,
+    "ground_truth_category": "UPI Scam",
+    "transcript": "Sir I am sending you a refund of 5000 rupees. Please scan this QR code and enter your secret UPI PIN to receive the money in your account.",
+    "warning_turn_index": 1,
+    "warning_offset_sec": 3.5
+  },
+  {
+    "id": "legit_kyc_branch_04",
+    "is_scam": false,
+    "ground_truth_category": "Legitimate Conversation",
+    "transcript": "Good morning. I need to update my KYC at the bank branch tomorrow morning when I visit with my Aadhaar document.",
+    "warning_turn_index": null,
+    "warning_offset_sec": null
+  },
+  {
+    "id": "legit_courier_delivery_05",
+    "is_scam": false,
+    "ground_truth_category": "Legitimate Conversation",
+    "transcript": "Hi, this is Blue Dart courier. I have a book parcel for Rahul. Are you available at your address to collect it?",
+    "warning_turn_index": null,
+    "warning_offset_sec": null
+  },
+  {
+    "id": "legit_dinner_split_06",
+    "is_scam": false,
+    "ground_truth_category": "Legitimate Conversation",
+    "transcript": "Hey bro, thanks for dinner yesterday! My friend sent me money through UPI to split the bill, so I just transferred your share.",
+    "warning_turn_index": null,
+    "warning_offset_sec": null
+  }
+]

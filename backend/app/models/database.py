@@ -48,6 +48,15 @@ class EvidenceRecord(Base):
     grounded = Column(Boolean, default=True)
     call_analysis = relationship("CallAnalysisRecord", back_populates="evidence_items")
 
+class UserFeedbackRecord(Base):
+    __tablename__ = "user_feedbacks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    call_id = Column(String(36), index=True)
+    user_label = Column(String(50))  # SCAM, LEGITIMATE, FALSE_ALARM
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 
