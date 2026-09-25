@@ -18,11 +18,17 @@ import PrivacyCenter from './components/PrivacyCenter';
 import ScamKnowledgeBase from './components/ScamKnowledgeBase';
 import EvaluationDashboard from './components/EvaluationDashboard';
 import PostCallSafetyReportModal from './components/PostCallSafetyReportModal';
+import CoachingPromptCard from './components/CoachingPromptCard';
+import EmotionalManipulationMeter from './components/EmotionalManipulationMeter';
+import ScriptFingerprintBadge from './components/ScriptFingerprintBadge';
+import CallerReputationBadge from './components/CallerReputationBadge';
+import TamperEvidentAuditModal from './components/TamperEvidentAuditModal';
 import { Mic, MicOff, Send, Radio, Sparkles, AlertCircle, RefreshCw, MessageSquarePlus, FileText } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('live');
   const [easyMode, setEasyMode] = useState(false);
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [language, setLanguage] = useState('en');
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -273,12 +279,20 @@ export default function App() {
         onOpenKnowledgeBase={() => setIsKnowledgeBaseOpen(true)}
         onOpenEvaluation={() => setIsEvaluationOpen(true)}
         onOpenReport={handleOpenReport}
+        onOpenAudit={() => setIsAuditModalOpen(true)}
       />
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px', flex: 1, width: '100%' }}>
         {/* TAB 1: LIVE CALL MONITOR */}
         {activeTab === 'live' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
+            {/* Caller Reputation & Script Fingerprint Banner if detected */}
+            {currentAnalysis.callerReputation && (
+              <CallerReputationBadge callerReputation={currentAnalysis.callerReputation} />
+            )}
+            {currentAnalysis.scriptFingerprint && currentAnalysis.scriptFingerprint.matched && (
+              <ScriptFingerprintBadge scriptFingerprint={currentAnalysis.scriptFingerprint} />
+            )}
             {/* Live Controller Bar */}
             <div className="glass-panel" style={{ padding: '18px 24px', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -333,6 +347,10 @@ export default function App() {
                   isProvisional={isProvisional}
                   easyMode={easyMode}
                 />
+
+                {currentAnalysis.coaching && (
+                  <CoachingPromptCard coaching={currentAnalysis.coaching} />
+                )}
 
                 <FeatureAttributionDrawer
                   attributions={currentAnalysis.attributions}
@@ -410,9 +428,12 @@ export default function App() {
               </div>
             </div>
 
-            {/* Deep Conversational Intelligence: Identity Audit, Scam Intent Chain, Attack Timeline */}
+            {/* Deep Conversational Intelligence: Identity Audit, Emotional Manipulation, Intent Chain, Timeline */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '10px' }}>
               <IdentityVerificationPanel identityAudit={currentAnalysis.identityAudit} />
+              {currentAnalysis.emotionAnalysis && (
+                <EmotionalManipulationMeter emotionData={currentAnalysis.emotionAnalysis} />
+              )}
               <IntentChain intentChain={currentAnalysis.intentChain} />
               <AttackTimeline timeline={currentAnalysis.timeline} />
             </div>
@@ -553,6 +574,13 @@ export default function App() {
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         reportData={activeReportData}
+      />
+
+      {/* Tamper-Evident Cryptographic Audit Ledger Modal */}
+      <TamperEvidentAuditModal
+        isOpen={isAuditModalOpen}
+        onClose={() => setIsAuditModalOpen(false)}
+        sessionId={currentAnalysis.id}
       />
     </div>
   );

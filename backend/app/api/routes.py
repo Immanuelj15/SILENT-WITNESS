@@ -21,6 +21,12 @@ from backend.app.agents.supervisor_agent import SupervisorAgent
 from backend.app.audio.preprocessor import AudioPreprocessor
 from backend.app.audio.deepfake_detector import VoiceDeepfakeDetector
 from backend.app.transcription.stt_service import stt_service
+from backend.app.services.caller_reputation import caller_reputation_service
+from backend.app.services.script_fingerprint import script_fingerprint_engine, SCAM_SCRIPT_TEMPLATES
+from backend.app.services.emotion_engine import emotion_engine
+from backend.app.services.coaching import coaching_engine
+from backend.app.services.audit_logger import get_or_create_ledger
+from backend.app.services.multimodal_context import multimodal_engine
 
 router = APIRouter(prefix="/api", tags=["Silent Witness API"])
 supervisor = SupervisorAgent()
@@ -525,4 +531,77 @@ def get_evaluation_metrics():
     """
     metrics = evaluate_benchmark()
     return metrics
+
+
+# Tier 2 & Tier 3 Architecture Endpoints
+
+@router.post("/caller/reputation")
+def evaluate_caller_reputation(payload: Dict[str, Any]):
+    """
+    Evaluates caller phone number against spam/spoof signatures and directory registries.
+    """
+    phone = payload.get("phone_number", "")
+    is_contact = payload.get("is_in_contacts", False)
+    contact_name = payload.get("contact_name")
+    return caller_reputation_service.evaluate_caller(
+        phone_number=phone,
+        is_in_contacts=is_contact,
+        contact_name=contact_name
+    )
+
+
+@router.post("/sms-context/correlate")
+def correlate_sms_prior(payload: Dict[str, Any]):
+    """
+    Correlates recent incoming SMS phishing lures with the ongoing spoken call.
+    """
+    recent_msgs = payload.get("recent_messages", [])
+    transcript = payload.get("transcript", "")
+    return multimodal_engine.correlate_sms_with_call(
+        recent_messages=recent_msgs,
+        call_transcript=transcript
+    )
+
+
+@router.get("/coaching")
+def get_coaching_suggestion(
+    intent_type: str = "",
+    risk_level: str = "SAFE",
+    scam_category: str = ""
+):
+    """
+    Provides real-time defensive dialogue coaching prompts ("What to say right now").
+    """
+    return coaching_engine.get_coaching_prompt(
+        intent_type=intent_type,
+        risk_level=risk_level,
+        scam_category=scam_category
+    )
+
+
+@router.get("/audit-log/{session_id}")
+def get_session_audit_log(session_id: str):
+    """
+    Retrieves the tamper-evident cryptographic hash-chain audit log for a session.
+    """
+    ledger = get_or_create_ledger(session_id)
+    return ledger.export_evidence_package()
+
+
+@router.get("/audit-log/{session_id}/verify")
+def verify_session_audit_integrity(session_id: str):
+    """
+    Verifies that no block in the cryptographic hash chain has been altered.
+    """
+    ledger = get_or_create_ledger(session_id)
+    return ledger.verify_integrity()
+
+
+@router.get("/script-fingerprint/templates")
+def get_scam_script_templates():
+    """
+    Returns canonical scam script fingerprints and safe exit advice.
+    """
+    return SCAM_SCRIPT_TEMPLATES
+
 

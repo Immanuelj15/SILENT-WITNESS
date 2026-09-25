@@ -77,6 +77,11 @@ class AnalysisResult(BaseModel):
     identityAudit: Optional[Dict[str, Any]] = None
     intervention: Optional[Dict[str, Any]] = None
     multilingual: Optional[Dict[str, Any]] = None
+    scriptFingerprint: Optional[Dict[str, Any]] = None
+    emotionAnalysis: Optional[Dict[str, Any]] = None
+    coaching: Optional[Dict[str, Any]] = None
+    callerReputation: Optional[Dict[str, Any]] = None
+    auditBlock: Optional[Dict[str, Any]] = None
     latency_ms: Optional[float] = None
     created_at: Optional[str] = None
 

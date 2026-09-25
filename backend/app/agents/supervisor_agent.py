@@ -9,6 +9,11 @@ from backend.app.services.intent_chain import intent_chain_engine
 from backend.app.services.timeline import timeline_engine
 from backend.app.services.intervention import intervention_engine
 from backend.app.services.multilingual import multilingual_engine
+from backend.app.services.caller_reputation import caller_reputation_service
+from backend.app.services.script_fingerprint import script_fingerprint_engine
+from backend.app.services.emotion_engine import emotion_engine
+from backend.app.services.coaching import coaching_engine
+from backend.app.services.audit_logger import get_or_create_ledger
 from backend.app.risk.categories import ScamCategory, INDIAN_SCAM_SIGNALS
 from backend.app.risk.engine import DeterministicRiskEngine
 from backend.app.models.schemas import (
@@ -41,6 +46,10 @@ class SupervisorAgent:
         self.timeline_engine = timeline_engine
         self.intervention_engine = intervention_engine
         self.multilingual_engine = multilingual_engine
+        self.caller_reputation_service = caller_reputation_service
+        self.script_fingerprint_engine = script_fingerprint_engine
+        self.emotion_engine = emotion_engine
+        self.coaching_engine = coaching_engine
         self.risk_engine = DeterministicRiskEngine()
         self.diarizer = SpeakerDiarizer()
         self.attribution_engine = AttributionEngine()
@@ -90,7 +99,11 @@ class SupervisorAgent:
         self,
         transcript: str,
         voice_result: Optional[VoiceAnalysisResult] = None,
-        is_provisional: bool = False
+        is_provisional: bool = False,
+        session_id: Optional[str] = None,
+        phone_number: Optional[str] = None,
+        caller_is_contact: bool = False,
+        contact_name: Optional[str] = None
     ) -> AnalysisResult:
         # Step 0: Check for prompt injection attacks in transcript
         injection_check = detect_prompt_injection_attempt(transcript)
@@ -256,6 +269,49 @@ class SupervisorAgent:
 
         severity_tier = self.attribution_engine.get_severity_tier(trust_score)
 
+        # Compute Tier 2 & Tier 3 Intelligence:
+        # 1. Script Fingerprint
+        script_match = self.script_fingerprint_engine.match_transcript(
+            [t.get("text", "") for t in diarized_turns] if diarized_turns else [transcript]
+        )
+
+        # 2. Emotional Manipulation & User Stress Sub-score
+        emotion_res = self.emotion_engine.analyze_turns(diarized_turns)
+
+        # 3. Real-Time Coaching Prompts
+        coaching_res = self.coaching_engine.get_coaching_prompt(
+            intent_type=(intent_res["demands"][0] if intent_res["demands"] else ""),
+            risk_level=classification,
+            scam_category=category
+        )
+
+        # 4. Caller Reputation & Risk Tiering
+        caller_rep = None
+        if phone_number:
+            caller_rep = self.caller_reputation_service.evaluate_caller(
+                phone_number=phone_number,
+                is_in_contacts=caller_is_contact,
+                contact_name=contact_name
+            )
+
+        # 5. Tamper-Evident Audit Ledger Block
+        audit_block_data = None
+        effective_session_id = session_id or "default-session"
+        ledger = get_or_create_ledger(effective_session_id)
+        block = ledger.add_block(
+            event_type="ANALYSIS_EVALUATION",
+            data={
+                "riskScore": risk_score,
+                "trustScore": trust_score,
+                "classification": classification,
+                "category": category,
+                "groundedEvidenceCount": len(grounded_evidence),
+                "scriptMatched": script_match.get("matched", False),
+                "emotionalScore": emotion_res.get("emotional_manipulation_score", 0)
+            }
+        )
+        audit_block_data = block.to_dict()
+
         return AnalysisResult(
             classification=classification,
             riskScore=risk_score,
@@ -282,5 +338,10 @@ class SupervisorAgent:
             intentChain=intent_chain,
             identityAudit=identity_audit,
             intervention=intervention,
-            multilingual=multilingual_res
+            multilingual=multilingual_res,
+            scriptFingerprint=script_match,
+            emotionAnalysis=emotion_res,
+            coaching=coaching_res,
+            callerReputation=caller_rep,
+            auditBlock=audit_block_data
         )

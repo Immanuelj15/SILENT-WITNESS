@@ -77,7 +77,8 @@ async def live_call_websocket(websocket: WebSocket):
             analysis = supervisor.process_conversation(
                 transcript=accumulated_transcript,
                 voice_result=voice_res,
-                is_provisional=not is_final
+                is_provisional=not is_final,
+                session_id=session_id
             )
             analysis.id = session_id
             analysis.is_provisional = not is_final
@@ -126,7 +127,26 @@ async def live_call_websocket(websocket: WebSocket):
                 }
             })
 
-            # e. Active Intervention
+            # e. Tier 2 & 3 Real-Time Events
+            if analysis.scriptFingerprint and analysis.scriptFingerprint.get("matched"):
+                await websocket.send_json({
+                    "event": "script_match",
+                    "data": analysis.scriptFingerprint
+                })
+
+            if analysis.emotionAnalysis:
+                await websocket.send_json({
+                    "event": "emotion_update",
+                    "data": analysis.emotionAnalysis
+                })
+
+            if analysis.coaching:
+                await websocket.send_json({
+                    "event": "coaching_prompt",
+                    "data": analysis.coaching
+                })
+
+            # f. Active Intervention
             if analysis.intervention:
                 await websocket.send_json({
                     "event": "intervention_triggered",

@@ -12,7 +12,8 @@ export default function Header({
   onOpenPrivacyCenter = null,
   onOpenKnowledgeBase = null,
   onOpenEvaluation = null,
-  onOpenReport = null
+  onOpenReport = null,
+  onOpenAudit = null
 }) {
   const languages = [
     { code: 'en', label: 'English' },
@@ -116,6 +117,16 @@ export default function Header({
             title="View Real Empirical Model Metrics & Latencies"
           >
             📊 Evaluation
+          </button>
+
+          {/* Tamper-Evident Audit Ledger */}
+          <button
+            onClick={onOpenAudit}
+            className="btn-secondary"
+            style={{ padding: '7px 10px', fontSize: '0.78rem' }}
+            title="Inspect Cryptographic SHA-256 Tamper-Evident Audit Chain"
+          >
+            ⛓️ Audit Ledger
           </button>
 
           {/* Privacy Center */}
