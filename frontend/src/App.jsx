@@ -11,7 +11,14 @@ import HistoryDashboard from './components/HistoryDashboard';
 import MobileCallModal from './components/MobileCallModal';
 import FeatureAttributionDrawer from './components/FeatureAttributionDrawer';
 import UserFeedbackModal from './components/UserFeedbackModal';
-import { Mic, MicOff, Send, Radio, Sparkles, AlertCircle, RefreshCw, MessageSquarePlus } from 'lucide-react';
+import AttackTimeline from './components/AttackTimeline';
+import IntentChain from './components/IntentChain';
+import IdentityVerificationPanel from './components/IdentityVerificationPanel';
+import PrivacyCenter from './components/PrivacyCenter';
+import ScamKnowledgeBase from './components/ScamKnowledgeBase';
+import EvaluationDashboard from './components/EvaluationDashboard';
+import PostCallSafetyReportModal from './components/PostCallSafetyReportModal';
+import { Mic, MicOff, Send, Radio, Sparkles, AlertCircle, RefreshCw, MessageSquarePlus, FileText } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('live');
@@ -19,6 +26,11 @@ export default function App() {
   const [language, setLanguage] = useState('en');
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [isPrivacyCenterOpen, setIsPrivacyCenterOpen] = useState(false);
+  const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
+  const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [activeReportData, setActiveReportData] = useState(null);
 
   // Live Call Streaming State
   const [isRecording, setIsRecording] = useState(false);
@@ -199,6 +211,48 @@ export default function App() {
     setManualInputText('');
   };
 
+  // Handle Post-Call Report Generation & Display
+  const handleOpenReport = async () => {
+    if (currentAnalysis?.id) {
+      try {
+        const res = await fetch(`http://localhost:8000/api/analysis/${currentAnalysis.id}/report`);
+        if (res.ok) {
+          const rep = await res.json();
+          setActiveReportData(rep);
+          setIsReportModalOpen(true);
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to fetch report:", e);
+      }
+    }
+    // Fallback: assemble provisional report
+    setActiveReportData({
+      reportId: `REP-${Date.now().toString(36).toUpperCase()}`,
+      callId: currentAnalysis.id || 'LIVE-CALL',
+      generatedAt: new Date().toISOString(),
+      callSummary: {
+        durationSec: callDuration || 65,
+        durationFormatted: `${Math.floor((callDuration || 65) / 60)}:${String((callDuration || 65) % 60).padStart(2, '0')}`,
+        primaryLanguage: currentAnalysis.multilingual?.primaryLanguage || 'English',
+        finalClassification: currentAnalysis.classification,
+        trustScore: currentAnalysis.trustScore,
+        riskScore: currentAnalysis.riskScore,
+        modelConfidence: currentAnalysis.confidence,
+        scamCategory: currentAnalysis.category
+      },
+      majorRiskSignals: currentAnalysis.riskFactors || [],
+      scamIntentChain: currentAnalysis.intentChain || { stages: [] },
+      attackTimeline: currentAnalysis.timeline || [],
+      callerIdentityAudit: currentAnalysis.identityAudit || { claimedOrganization: 'Unknown', verificationStatus: 'UNKNOWN' },
+      recommendedActions: currentAnalysis.actions || [],
+      privacySafeSummary: {
+        summaryText: `Call evaluated as ${currentAnalysis.classification} (Trust: ${currentAnalysis.trustScore}/100, Risk: ${currentAnalysis.riskScore}/100). Category: ${currentAnalysis.category}. Primary recommendation: ${currentAnalysis.actions?.[0] || 'Stay cautious'}.`
+      }
+    });
+    setIsReportModalOpen(true);
+  };
+
   // Demo step trigger
   const handleDemoStepSimulate = (accumulatedTranscript, stepConfig) => {
     setLiveTranscript(accumulatedTranscript);
@@ -215,6 +269,10 @@ export default function App() {
         language={language}
         setLanguage={setLanguage}
         onOpenMobileView={() => setIsMobileModalOpen(true)}
+        onOpenPrivacyCenter={() => setIsPrivacyCenterOpen(true)}
+        onOpenKnowledgeBase={() => setIsKnowledgeBaseOpen(true)}
+        onOpenEvaluation={() => setIsEvaluationOpen(true)}
+        onOpenReport={handleOpenReport}
       />
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px', flex: 1, width: '100%' }}>
@@ -246,12 +304,20 @@ export default function App() {
                   </button>
                 )}
                 <button
+                  onClick={handleOpenReport}
+                  className="btn-secondary"
+                  style={{ padding: '12px 16px', fontSize: '0.85rem' }}
+                  title="Generate and view post-call safety intelligence report"
+                >
+                  <FileText size={16} /> Safety Report
+                </button>
+                <button
                   onClick={() => setIsFeedbackModalOpen(true)}
                   className="btn-secondary"
                   style={{ padding: '12px 16px', fontSize: '0.85rem' }}
                   title="Submit accuracy calibration feedback"
                 >
-                  <MessageSquarePlus size={16} /> Calibrate / Feedback
+                  <MessageSquarePlus size={16} /> Calibrate
                 </button>
               </div>
             </div>
@@ -342,6 +408,13 @@ export default function App() {
                   easyMode={easyMode}
                 />
               </div>
+            </div>
+
+            {/* Deep Conversational Intelligence: Identity Audit, Scam Intent Chain, Attack Timeline */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '10px' }}>
+              <IdentityVerificationPanel identityAudit={currentAnalysis.identityAudit} />
+              <IntentChain intentChain={currentAnalysis.intentChain} />
+              <AttackTimeline timeline={currentAnalysis.timeline} />
             </div>
           </div>
         )}
@@ -455,6 +528,31 @@ export default function App() {
         isOpen={isFeedbackModalOpen}
         onClose={() => setIsFeedbackModalOpen(false)}
         callId={currentAnalysis.id}
+      />
+
+      {/* Privacy Center Modal */}
+      <PrivacyCenter
+        isOpen={isPrivacyCenterOpen}
+        onClose={() => setIsPrivacyCenterOpen(false)}
+      />
+
+      {/* Scam Knowledge Base Modal */}
+      <ScamKnowledgeBase
+        isOpen={isKnowledgeBaseOpen}
+        onClose={() => setIsKnowledgeBaseOpen(false)}
+      />
+
+      {/* Evaluation Dashboard Modal */}
+      <EvaluationDashboard
+        isOpen={isEvaluationOpen}
+        onClose={() => setIsEvaluationOpen(false)}
+      />
+
+      {/* Post-Call Safety Report Modal */}
+      <PostCallSafetyReportModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        reportData={activeReportData}
       />
     </div>
   );

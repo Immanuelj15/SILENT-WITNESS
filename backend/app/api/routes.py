@@ -332,3 +332,197 @@ def submit_user_feedback(feedback: Dict[str, Any], db: Session = Depends(get_db)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Feedback recording error: {str(e)}")
 
+# =========================================================================
+# SECTION 67: EXTENDED API SPECIFICATION IMPLEMENTATION
+# =========================================================================
+
+from backend.app.services.knowledge_base import scam_knowledge_base
+from backend.app.services.identity_verifier import caller_identity_verifier
+from backend.app.services.intervention import intervention_engine
+from backend.app.services.report_generator import report_generator
+from backend.app.services.intent_chain import intent_chain_engine
+from backend.app.services.timeline import timeline_engine
+from evaluation.metrics import evaluate_benchmark
+from backend.app.core.config import settings
+
+@router.get("/analysis/{call_id}")
+def get_analysis_by_id(call_id: str, db: Session = Depends(get_db)):
+    """
+    Retrieves full analysis record by call ID.
+    """
+    record = db.query(CallAnalysisRecord).filter(CallAnalysisRecord.id == call_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Analysis record not found")
+    
+    # Re-run supervisor to obtain full rich structured tree
+    analysis = supervisor.process_conversation(record.transcript)
+    analysis.id = record.id
+    return analysis
+
+@router.get("/analysis/{call_id}/timeline")
+def get_analysis_timeline(call_id: str, db: Session = Depends(get_db)):
+    record = db.query(CallAnalysisRecord).filter(CallAnalysisRecord.id == call_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Analysis record not found")
+    return {
+        "callId": call_id,
+        "timeline": timeline_engine.build_timeline(record.transcript)
+    }
+
+@router.get("/analysis/{call_id}/intent-chain")
+def get_analysis_intent_chain(call_id: str, db: Session = Depends(get_db)):
+    record = db.query(CallAnalysisRecord).filter(CallAnalysisRecord.id == call_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Analysis record not found")
+    return {
+        "callId": call_id,
+        "intentChain": intent_chain_engine.build_intent_chain(record.transcript)
+    }
+
+@router.get("/analysis/{call_id}/evidence")
+def get_analysis_evidence(call_id: str, db: Session = Depends(get_db)):
+    ev_records = db.query(EvidenceRecord).filter(EvidenceRecord.call_id == call_id).all()
+    return {
+        "callId": call_id,
+        "evidence": [
+            {
+                "phrase": ev.exact_phrase,
+                "tag": ev.tag,
+                "isGrounded": ev.grounded
+            }
+            for ev in ev_records
+        ]
+    }
+
+@router.get("/analysis/{call_id}/identity")
+def get_analysis_identity(call_id: str, db: Session = Depends(get_db)):
+    record = db.query(CallAnalysisRecord).filter(CallAnalysisRecord.id == call_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Analysis record not found")
+    audit = caller_identity_verifier.verify_caller_claim(transcript=record.transcript)
+    return {
+        "callId": call_id,
+        "identityAudit": audit
+    }
+
+@router.get("/analysis/{call_id}/report")
+def get_analysis_report(call_id: str, db: Session = Depends(get_db)):
+    record = db.query(CallAnalysisRecord).filter(CallAnalysisRecord.id == call_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Analysis record not found")
+    
+    analysis = supervisor.process_conversation(record.transcript)
+    analysis.id = record.id
+    report = report_generator.generate_report(
+        call_id=call_id,
+        analysis_result=analysis.model_dump(),
+        intent_chain=analysis.intentChain,
+        timeline_events=analysis.timeline,
+        identity_audit=analysis.identityAudit,
+        multilingual_info=analysis.multilingual,
+        duration_seconds=record.duration_sec or 65.0
+    )
+    return report
+
+@router.post("/identity/verify")
+def verify_identity_claim(payload: Dict[str, Any]):
+    claimed_name = payload.get("claimedName") or payload.get("claimed_name")
+    claimed_org = payload.get("claimedOrg") or payload.get("claimed_org")
+    phone = payload.get("callerPhone") or payload.get("caller_phone")
+    transcript = payload.get("transcript", "")
+
+    result = caller_identity_verifier.verify_caller_claim(
+        claimed_name=claimed_name,
+        claimed_org=claimed_org,
+        caller_phone=phone,
+        transcript=transcript
+    )
+    return result
+
+@router.post("/intervention/confirm")
+def confirm_intervention_action(payload: Dict[str, Any]):
+    conf_id = payload.get("confirmationId") or payload.get("confirmation_id")
+    approved = payload.get("approved", False)
+    if not conf_id:
+        raise HTTPException(status_code=400, detail="Missing confirmationId")
+    res = intervention_engine.resolve_confirmation(conf_id, approved)
+    return res
+
+@router.get("/knowledge-base")
+def list_knowledge_base():
+    categories = scam_knowledge_base.list_categories()
+    return {
+        "count": len(categories),
+        "categories": categories
+    }
+
+@router.get("/knowledge-base/{category_key}")
+def get_knowledge_base_category(category_key: str):
+    cat = scam_knowledge_base.get_category(category_key)
+    if not cat:
+        raise HTTPException(status_code=404, detail=f"Knowledge base category '{category_key}' not found")
+    return cat
+
+# Privacy Center state storage
+PRIVACY_STATE = {
+    "audioStorageEnabled": False,
+    "transcriptStorageEnabled": True,
+    "retentionPeriodDays": 7,
+    "localProcessingEnabled": True,
+    "cloudProcessingEnabled": False,
+    "analyticsConsent": True
+}
+
+@router.get("/privacy/settings")
+def get_privacy_settings():
+    return PRIVACY_STATE
+
+@router.put("/privacy/settings")
+def update_privacy_settings(payload: Dict[str, Any]):
+    for k, v in payload.items():
+        if k in PRIVACY_STATE:
+            PRIVACY_STATE[k] = v
+    return {
+        "success": True,
+        "message": "Privacy settings updated successfully",
+        "settings": PRIVACY_STATE
+    }
+
+@router.delete("/privacy/data")
+def delete_all_user_data(db: Session = Depends(get_db)):
+    """
+    Permanently deletes all call records, transcripts, evidence items, and temporary audio files.
+    """
+    try:
+        from backend.app.models.database import UserFeedbackRecord
+        db.query(EvidenceRecord).delete()
+        db.query(RiskFactorRecord).delete()
+        db.query(UserFeedbackRecord).delete()
+        db.query(CallAnalysisRecord).delete()
+        db.commit()
+
+        # Clean temporary audio directory
+        import os, shutil
+        if os.path.exists(settings.TEMP_STORAGE_DIR):
+            for item in os.listdir(settings.TEMP_STORAGE_DIR):
+                item_path = os.path.join(settings.TEMP_STORAGE_DIR, item)
+                if os.path.isfile(item_path):
+                    os.unlink(item_path)
+
+        return {
+            "success": True,
+            "message": "All user data, transcripts, and cached audio files permanently deleted."
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete data: {str(e)}")
+
+@router.get("/evaluation")
+@router.get("/evaluation/metrics")
+def get_evaluation_metrics():
+    """
+    Returns actual measured performance metrics from benchmark dataset evaluation.
+    """
+    metrics = evaluate_benchmark()
+    return metrics
+

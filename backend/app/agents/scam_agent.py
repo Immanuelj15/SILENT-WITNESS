@@ -7,23 +7,23 @@ class ScamAgent:
     urgency, intimidation, and pressure patterns.
     """
 
-    # Indicators of urgency & pressure
+    # Indicators of urgency & pressure (English, Tanglish, Hinglish)
     URGENCY_PATTERNS = [
-        (r"\b(immediately|right now|within (\d+|few) (minutes|hours)|urgently|at once)\b", "Urgency"),
-        (r"\b(account will be (blocked|suspended|frozen|closed|terminated))\b", "Account Suspension Threat"),
-        (r"\b(today itself|last chance|offer expires|police will be sent)\b", "Severe Pressure / Deadline"),
+        (r"\b(immediately|right now|within (\d+|few) (minutes|hours)|urgently|at once|immediate-ah|turant|jaldi|without delay)\b", "Urgency"),
+        (r"\b(account will be (blocked|suspended|frozen|closed|terminated)|account block aagidum|account block ho jayega|account band)\b", "Account Suspension Threat"),
+        (r"\b(today itself|last chance|offer expires|police will be sent|police aayegi)\b", "Severe Pressure / Deadline"),
     ]
 
     # Threats and intimidation
     THREAT_PATTERNS = [
-        (r"\b(police|cbi|arrest|warrant|court|legal action|customs case|fir)\b", "Legal/Law Enforcement Threat"),
-        (r"\b(penalty|fine of \d+|confiscated|drug parcel|digital arrest)\b", "Imprisonment / Seizure Threat"),
+        (r"\b(police|cbi|arrest|warrant|court|legal action|customs case|fir|digital arrest)\b", "Legal/Law Enforcement Threat"),
+        (r"\b(penalty|fine of \d+|confiscated|drug parcel|police station|jail)\b", "Imprisonment / Seizure Threat"),
     ]
 
     # Indian scam specific patterns
     INDIAN_TACTICS = [
         (r"\b(electricity bill unpaid|power will be disconnected)\b", "Electricity Disconnection Threat"),
-        (r"\b(like youtube video|telegram task|daily income)\b", "Part-Time Task Scam"),
+        (r"\b(like youtube video|telegram task|daily income|registration fee|part-time remote work)\b", "Part-Time Task Scam"),
         (r"\b(lottery won|kbc prize|lucky draw prize)\b", "Prize / Lottery Hook"),
         (r"\b(scan qr code to receive|enter upi pin to get)\b", "UPI Inversion Fraud"),
     ]

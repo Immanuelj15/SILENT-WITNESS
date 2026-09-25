@@ -46,5 +46,59 @@
     "transcript": "Hey bro, thanks for dinner yesterday! My friend sent me money through UPI to split the bill, so I just transferred your share.",
     "warning_turn_index": null,
     "warning_offset_sec": null
+  },
+  {
+    "id": "tanglish_bank_otp_07",
+    "is_scam": true,
+    "language": "Tamil-English",
+    "ground_truth_category": "Banking Scam",
+    "transcript": "Sir unga account block aagidum, suspicious transaction irukku. OTP immediate-ah sollunga sir to stop the block.",
+    "warning_turn_index": 1,
+    "warning_offset_sec": 3.2
+  },
+  {
+    "id": "hinglish_police_threat_08",
+    "is_scam": true,
+    "language": "Hindi-English",
+    "ground_truth_category": "Police/Legal Threat Scam",
+    "transcript": "Aapka account block ho jayega aur police aayegi. Digital arrest se bachne ke liye turant OTP batayein aur paise transfer kijiye.",
+    "warning_turn_index": 1,
+    "warning_offset_sec": 3.8
+  },
+  {
+    "id": "family_emergency_09",
+    "is_scam": true,
+    "language": "English",
+    "ground_truth_category": "Family Emergency",
+    "transcript": "Mom, I am in serious trouble at the police station. Please do not tell dad, send 50000 rupees immediately to this UPI number.",
+    "warning_turn_index": 1,
+    "warning_offset_sec": 3.5
+  },
+  {
+    "id": "job_telegram_10",
+    "is_scam": true,
+    "language": "English",
+    "ground_truth_category": "Job Scam",
+    "transcript": "Hello, we offer part-time remote work. Like YouTube videos and earn 5000 daily. First deposit 1000 rupees registration fee to unlock tasks.",
+    "warning_turn_index": 1,
+    "warning_offset_sec": 4.0
+  },
+  {
+    "id": "legit_hospital_11",
+    "is_scam": false,
+    "language": "English",
+    "ground_truth_category": "Legitimate Conversation",
+    "transcript": "Hello, this is the hospital appointment desk. Your routine health checkup is scheduled for tomorrow at 10 AM. Please bring your insurance card.",
+    "warning_turn_index": null,
+    "warning_offset_sec": null
+  },
+  {
+    "id": "legit_tamil_family_12",
+    "is_scam": false,
+    "language": "Tamil-English",
+    "ground_truth_category": "Legitimate Conversation",
+    "transcript": "Amma, naan veetukku varren. Train 10 minutes-la arrive aagidum, dinner ready pannunga.",
+    "warning_turn_index": null,
+    "warning_offset_sec": null
   }
 ]

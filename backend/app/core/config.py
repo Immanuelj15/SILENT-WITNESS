@@ -24,17 +24,20 @@ class Settings(BaseSettings):
     SAMPLE_RATE: int = 16000
     CHUNK_DURATION_SEC: float = 3.0
 
-    # Risk Engine Configurable Weights (Must sum to 1.0)
-    WEIGHT_VOICE_RISK: float = 0.35
-    WEIGHT_SOCIAL_ENGINEERING: float = 0.25
+    # Risk Engine Configurable Weights (Section 6: Must sum to 1.0)
+    WEIGHT_VOICE_RISK: float = 0.25
+    WEIGHT_SOCIAL_ENGINEERING: float = 0.20
     WEIGHT_FRAUD_INTENT: float = 0.20
-    WEIGHT_IDENTITY_RISK: float = 0.10
+    WEIGHT_IDENTITY_RISK: float = 0.15
     WEIGHT_THREAT_RISK: float = 0.10
+    WEIGHT_EVIDENCE_RISK: float = 0.10
 
-    # Risk Thresholds
-    THRESHOLD_LOW: int = 30
-    THRESHOLD_SUSPICIOUS: int = 60
+    # Risk Thresholds & States (Section 45: SAFE, CAUTION, SUSPICIOUS, HIGH_RISK, CRITICAL)
+    THRESHOLD_SAFE: int = 20
+    THRESHOLD_CAUTION: int = 40
+    THRESHOLD_SUSPICIOUS: int = 65
     THRESHOLD_HIGH: int = 80
+    THRESHOLD_CRITICAL: int = 88
 
     # Local AI / LLM Configuration
     LLM_PROVIDER: str = "local_agent"

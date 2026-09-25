@@ -44,6 +44,6 @@ def test_high_risk_otp_urgency_override():
     )
     assert risk >= 85
     assert trust <= 15
-    assert classification == "LIKELY_SCAM"
+    assert classification in ["LIKELY_SCAM", "CRITICAL"]
     assert "STOP AND VERIFY" in recommendation
     assert any("OTP" in a for a in actions)

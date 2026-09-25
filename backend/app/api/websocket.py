@@ -82,7 +82,58 @@ async def live_call_websocket(websocket: WebSocket):
             analysis.id = session_id
             analysis.is_provisional = not is_final
 
-            # 4. Stream back real-time delta update to frontend
+            # 4. Deterministic Real-Time Event Sequence (Section 68 & 69)
+            # a. Transcript Event
+            await websocket.send_json({
+                "event": "transcript_final" if is_final else "transcript_partial",
+                "data": {
+                    "text": new_text,
+                    "accumulatedTranscript": accumulated_transcript,
+                    "isFinal": is_final
+                }
+            })
+
+            # b. Evidence found
+            if analysis.evidence:
+                await websocket.send_json({
+                    "event": "evidence_found",
+                    "data": [e.model_dump() for e in analysis.evidence]
+                })
+
+            # c. Intent & Identity update
+            if analysis.intentChain:
+                await websocket.send_json({
+                    "event": "intent_update",
+                    "data": analysis.intentChain
+                })
+
+            if analysis.identityAudit:
+                await websocket.send_json({
+                    "event": "identity_update",
+                    "data": analysis.identityAudit
+                })
+
+            # d. Risk & Trust score update
+            await websocket.send_json({
+                "event": "risk_update",
+                "data": {
+                    "riskScore": analysis.riskScore,
+                    "trustScore": analysis.trustScore,
+                    "status": analysis.classification,
+                    "confidence": analysis.confidence,
+                    "evidenceConfidence": analysis.evidenceConfidence,
+                    "isProvisional": not is_final
+                }
+            })
+
+            # e. Active Intervention
+            if analysis.intervention:
+                await websocket.send_json({
+                    "event": "intervention_triggered",
+                    "data": analysis.intervention
+                })
+
+            # Consolidated LIVE_UPDATE for backwards compatibility
             await websocket.send_json({
                 "type": "LIVE_UPDATE",
                 "sessionId": session_id,
@@ -93,10 +144,25 @@ async def live_call_websocket(websocket: WebSocket):
             })
 
             if is_final:
+                from backend.app.services.report_generator import report_generator
+                report_data = report_generator.generate_report(
+                    call_id=session_id,
+                    analysis_result=analysis.model_dump(),
+                    intent_chain=analysis.intentChain,
+                    timeline_events=analysis.timeline,
+                    identity_audit=analysis.identityAudit,
+                    multilingual_info=analysis.multilingual,
+                    duration_seconds=float(chunk_index * 3.0)
+                )
+                await websocket.send_json({
+                    "event": "report_ready",
+                    "data": report_data
+                })
                 await websocket.send_json({
                     "type": "CALL_CONCLUDED",
                     "sessionId": session_id,
-                    "finalAnalysis": analysis.model_dump()
+                    "finalAnalysis": analysis.model_dump(),
+                    "report": report_data
                 })
                 break
 

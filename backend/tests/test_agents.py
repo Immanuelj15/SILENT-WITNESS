@@ -42,7 +42,7 @@ def test_supervisor_agent_bank_otp_scam():
     supervisor = SupervisorAgent()
     text = "I am calling from your bank. Your account will be blocked today. Tell me the OTP immediately."
     res = supervisor.process_conversation(text)
-    assert res.classification in ["HIGH_RISK", "LIKELY_SCAM"]
+    assert res.classification in ["HIGH_RISK", "LIKELY_SCAM", "CRITICAL"]
     assert res.trustScore <= 20
     assert any("OTP" in f for f in res.riskFactors)
     assert "STOP AND VERIFY" in res.recommendation

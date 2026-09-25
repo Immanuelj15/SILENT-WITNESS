@@ -29,6 +29,8 @@ dist/
 # Database & temp audio
 temp_audio/
 *.log
+*.db
+silent_witness.db
 
 # OS
 .DS_Store

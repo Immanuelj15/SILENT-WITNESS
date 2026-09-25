@@ -8,16 +8,19 @@ class IntentAgent:
     Distinguishes legitimate mentions (e.g., 'I sent money') from active demands ('give me your OTP').
     """
 
-    # Active demands targeting sensitive credentials
+    # Active demands targeting sensitive credentials (supports English, Tamil, Hindi order)
     CREDENTIAL_DEMANDS = [
-        (r"\b(tell|give|share|send|read( out)?|provide)\b.*\b(otp|one time password|verification code)\b", "OTP Solicitation", 95.0),
-        (r"\b(enter|share|tell)\b.*\b(upi pin|atm pin|secret pin|mpin)\b", "PIN Solicitation", 95.0),
+        (r"\b(tell|give|share|send|read( out)?|provide|sollunga|batayein|kudunga|batao)\b.*\b(otp|one time password|verification code)\b", "OTP Solicitation", 95.0),
+        (r"\b(otp|one time password|verification code)\b.*\b(tell|give|share|send|read|sollunga|batayein|kudunga|batao)\b", "OTP Solicitation", 95.0),
+        (r"\b(enter|share|tell|sollunga|batayein)\b.*\b(upi pin|atm pin|secret pin|mpin)\b", "PIN Solicitation", 95.0),
+        (r"\b(upi pin|atm pin|secret pin|mpin)\b.*\b(enter|share|tell|sollunga|batayein)\b", "PIN Solicitation", 95.0),
         (r"\b(share|tell|give)\b.*\b(password|cvv|card number|expiry date)\b", "Card/Password Solicitation", 90.0),
     ]
 
-    # Active demands targeting money transfer or remote control app installation
+    # Active demands targeting money transfer, upfront fee, or remote control app installation
     ACTION_DEMANDS = [
         (r"\b(transfer|send|pay)\b.*\b(money|amount|rupees|rs\.?|\$|cash|fund)\b", "Direct Money Transfer Request", 75.0),
+        (r"\b(deposit|registration fee|unlock tasks)\b", "Task / Job Scam Upfront Deposit Demand", 80.0),
         (r"\b(download|install)\b.*\b(anydesk|teamviewer|quicksupport|rustdesk|apk|app)\b", "Remote Access Tool Demand", 90.0),
         (r"\b(click|open)\b.*\b(link|sms link|url|website)\b", "Malicious Link Direction", 65.0),
     ]

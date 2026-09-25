@@ -3,6 +3,12 @@ from backend.app.agents.scam_agent import ScamAgent
 from backend.app.agents.intent_agent import IntentAgent
 from backend.app.agents.identity_agent import IdentityAgent
 from backend.app.agents.evidence_agent import EvidenceAgent
+from backend.app.agents.social_engineering_agent import SocialEngineeringAgent
+from backend.app.services.identity_verifier import caller_identity_verifier
+from backend.app.services.intent_chain import intent_chain_engine
+from backend.app.services.timeline import timeline_engine
+from backend.app.services.intervention import intervention_engine
+from backend.app.services.multilingual import multilingual_engine
 from backend.app.risk.categories import ScamCategory, INDIAN_SCAM_SIGNALS
 from backend.app.risk.engine import DeterministicRiskEngine
 from backend.app.models.schemas import (
@@ -18,9 +24,10 @@ from backend.app.risk.attribution import AttributionEngine
 
 class SupervisorAgent:
     """
-    Supervisor Agent: Coordinates Scam, Intent, Identity, and Evidence agents.
-    Synthesizes findings, surfaces agent disagreements, passes verified claims to the
-    deterministic risk engine, generates speaker diarization, and calculates SHAP/feature attributions.
+    Supervisor Agent: Coordinates Scam, Intent, Identity, Evidence, and Social Engineering agents.
+    Synthesizes findings, surfaces agent disagreements, validates identity with official registries,
+    builds the sequential Scam Intent Chain and Attack Timeline, computes active intervention tiers,
+    and calculates transparent deterministic risk scores.
     """
 
     def __init__(self):
@@ -28,6 +35,12 @@ class SupervisorAgent:
         self.intent_agent = IntentAgent()
         self.identity_agent = IdentityAgent()
         self.evidence_agent = EvidenceAgent()
+        self.social_engineering_agent = SocialEngineeringAgent()
+        self.identity_verifier = caller_identity_verifier
+        self.intent_chain_engine = intent_chain_engine
+        self.timeline_engine = timeline_engine
+        self.intervention_engine = intervention_engine
+        self.multilingual_engine = multilingual_engine
         self.risk_engine = DeterministicRiskEngine()
         self.diarizer = SpeakerDiarizer()
         self.attribution_engine = AttributionEngine()
@@ -83,16 +96,29 @@ class SupervisorAgent:
         injection_check = detect_prompt_injection_attempt(transcript)
         prompt_injection_detected = injection_check["detected"]
 
+        # Step 0.5: Multilingual & Code-Switching Detection (preserves verbatim)
+        multilingual_res = self.multilingual_engine.analyze_language(transcript)
+
         # Step 1: Run Sub-agents
         scam_res = self.scam_agent.analyze(transcript)
         intent_res = self.intent_agent.analyze(transcript)
         identity_res = self.identity_agent.analyze(transcript)
+        soc_eng_res = self.social_engineering_agent.analyze(transcript)
+
+        # Step 1.5: Verify caller identity claim against official registry
+        identity_audit = self.identity_verifier.verify_caller_claim(
+            claimed_name=identity_res.get("claimed_identity"),
+            claimed_org=None,
+            caller_phone=None,
+            transcript=transcript
+        )
 
         # Step 2: Consolidate proposed evidence candidates
         raw_candidates = (
             scam_res["proposed_evidence"] +
             intent_res["proposed_evidence"] +
-            identity_res["proposed_evidence"]
+            identity_res["proposed_evidence"] +
+            soc_eng_res.get("proposed_evidence", [])
         )
 
         # Step 3: Evidence Agent filters hallucinated or unsupported claims
@@ -115,6 +141,10 @@ class SupervisorAgent:
                 discrepancy_detail="Caller requested an action/credential, but did not apply overt intimidation or urgency tactics."
             ))
 
+        # Combine social engineering risk with scam agent urgency/threat
+        combined_soc_eng = max(scam_res["social_engineering_score"], soc_eng_res.get("social_engineering_risk", 0.0))
+        identity_risk_val = max(identity_res["identity_risk_score"], identity_audit.get("riskScore", 0.0))
+
         # Voice metrics input
         voice_risk = voice_result.voiceRisk if voice_result else 15.0
 
@@ -122,14 +152,15 @@ class SupervisorAgent:
         risk_score, trust_score, breakdown, classification, recommendation, actions, easy_summary = (
             self.risk_engine.compute_risk(
                 voice_risk=voice_risk,
-                social_engineering_risk=scam_res["social_engineering_score"],
+                social_engineering_risk=combined_soc_eng,
                 fraud_intent_risk=intent_res["fraud_intent_score"],
-                identity_risk=identity_res["identity_risk_score"],
+                identity_risk=identity_risk_val,
                 threat_risk=scam_res["threat_score"],
                 evidence_items=grounded_evidence,
                 prompt_injection_detected=prompt_injection_detected
             )
         )
+        evidence_confidence = getattr(breakdown, "evidence_confidence", 0.90)
 
         # Determine Category
         category = self.determine_category(
@@ -145,7 +176,7 @@ class SupervisorAgent:
             risk_factors.append("OTP / Credential Request")
         if any("pin" in d.lower() for d in intent_res["demands"]):
             risk_factors.append("PIN Solicitation")
-        if scam_res["social_engineering_score"] > 30:
+        if combined_soc_eng > 30:
             risk_factors.append("Urgency & Psychological Pressure")
         if scam_res["threat_score"] > 30:
             risk_factors.append("Threat / Intimidation")
@@ -159,7 +190,7 @@ class SupervisorAgent:
         suspicious_phrases = [e.exact_phrase for e in grounded_evidence]
 
         # Calculate model confidence (Risk != Confidence)
-        confidence_samples = [scam_res["confidence"], intent_res["confidence"], identity_res["confidence"]]
+        confidence_samples = [scam_res["confidence"], intent_res["confidence"], identity_res["confidence"], soc_eng_res.get("confidence", 0.85)]
         avg_confidence = round(sum(confidence_samples) / len(confidence_samples), 2)
         if voice_result:
             avg_confidence = round((avg_confidence + voice_result.confidence) / 2.0, 2)
@@ -179,16 +210,39 @@ class SupervisorAgent:
             explanation = "Conversation patterns appear normal and consistent with legitimate interactions. No coercion or credential harvesting identified."
 
         agent_report = AgentAnalysisReport(
-            scam_agent_findings=scam_res["detected_tactics"],
+            scam_agent_findings=scam_res["detected_tactics"] + soc_eng_res.get("detected_vectors", []),
             intent_agent_demands=intent_res["demands"],
             identity_agent_claimed=identity_res["claimed_identity"],
-            identity_verified=False,
+            identity_verified=(identity_audit.get("verificationStatus") == "VERIFIED"),
             evidence_agent_rejected_claims=rejected_claims,
             disagreements=disagreements
         )
 
         # Compute Section 3.B Speaker Diarization Turns
         diarized_turns = [t.model_dump() for t in self.diarizer.segment_transcript_into_turns(transcript)]
+
+        # Compute Section 15 & 16 Scam Intent Chain
+        intent_chain = self.intent_chain_engine.build_intent_chain(
+            transcript=transcript,
+            dialogue_turns=diarized_turns,
+            evidence_items=grounded_evidence
+        )
+
+        # Compute Section 19 & 20 Attack Timeline
+        attack_timeline = self.timeline_engine.build_timeline(
+            transcript=transcript,
+            dialogue_turns=diarized_turns,
+            evidence_items=grounded_evidence
+        )
+
+        # Compute Section 21 & 22 Active Intervention
+        intervention = self.intervention_engine.evaluate_intervention(
+            trust_score=trust_score,
+            risk_score=risk_score,
+            primary_signals=risk_factors,
+            evidence_items=grounded_evidence,
+            identity_verified=(identity_audit.get("verificationStatus") == "VERIFIED")
+        )
 
         # Compute Section 3.F & 7 Feature Attributions and Severity Tier
         attributions = [a.model_dump() for a in self.attribution_engine.compute_attributions(
@@ -202,19 +256,12 @@ class SupervisorAgent:
 
         severity_tier = self.attribution_engine.get_severity_tier(trust_score)
 
-        timeline_point = {
-            "timestamp_sec": round(len(transcript.split()) * 0.4, 1),
-            "trust_score": trust_score,
-            "severity_tier": severity_tier["tier"],
-            "primary_event": risk_factors[0] if risk_factors else "Normal Dialogue",
-            "active_deductions": attributions
-        }
-
         return AnalysisResult(
             classification=classification,
             riskScore=risk_score,
             trustScore=trust_score,
             confidence=avg_confidence,
+            evidenceConfidence=evidence_confidence,
             category=category,
             transcript=transcript,
             is_provisional=is_provisional,
@@ -231,5 +278,9 @@ class SupervisorAgent:
             dialogueTurns=diarized_turns,
             attributions=attributions,
             severityTier=severity_tier,
-            timeline=[timeline_point]
+            timeline=attack_timeline,
+            intentChain=intent_chain,
+            identityAudit=identity_audit,
+            intervention=intervention,
+            multilingual=multilingual_res
         )

@@ -31,6 +31,8 @@ class RiskBreakdown(BaseModel):
     fraud_intent_risk: float = 0.0
     identity_risk: float = 0.0
     threat_risk: float = 0.0
+    evidence_risk: float = 0.0
+    evidence_confidence: float = 0.90
     weights_used: Dict[str, float] = Field(default_factory=dict)
 
 class AgentDisagreement(BaseModel):
@@ -53,6 +55,7 @@ class AnalysisResult(BaseModel):
     riskScore: int = 0  # 0 to 100
     trustScore: int = 100  # 100 - riskScore
     confidence: float = 0.85  # Model confidence (0.0 to 1.0)
+    evidenceConfidence: float = 0.90  # Evidence confidence (0.0 to 1.0)
     category: str = ScamCategory.LEGITIMATE_CONVERSATION.value
     transcript: str = ""
     is_provisional: bool = False
@@ -70,6 +73,10 @@ class AnalysisResult(BaseModel):
     attributions: List[Dict[str, Any]] = Field(default_factory=list)
     severityTier: Dict[str, str] = Field(default_factory=dict)
     timeline: List[Dict[str, Any]] = Field(default_factory=list)
+    intentChain: Optional[Dict[str, Any]] = None
+    identityAudit: Optional[Dict[str, Any]] = None
+    intervention: Optional[Dict[str, Any]] = None
+    multilingual: Optional[Dict[str, Any]] = None
     latency_ms: Optional[float] = None
     created_at: Optional[str] = None
 
