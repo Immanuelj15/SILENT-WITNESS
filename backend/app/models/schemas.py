@@ -82,11 +82,16 @@ class AnalysisResult(BaseModel):
     coaching: Optional[Dict[str, Any]] = None
     callerReputation: Optional[Dict[str, Any]] = None
     auditBlock: Optional[Dict[str, Any]] = None
+    channel: str = "SIM_CALL"
+    capabilities: Optional[Dict[str, Any]] = None
+    screenShareAnalysis: Optional[Dict[str, Any]] = None
+    videoAnalysisResult: Optional[Dict[str, Any]] = None
     latency_ms: Optional[float] = None
     created_at: Optional[str] = None
 
 class AnalyzeTextRequest(BaseModel):
     text: str = Field(..., min_length=1, description="Transcript text to analyze")
+    channel: Optional[str] = Field("SIM_CALL", description="Communication channel (SIM_CALL, WHATSAPP, VIDEO_CALL, OWN_VOIP, etc.)")
 
 class AudioUploadResponse(BaseModel):
     success: bool

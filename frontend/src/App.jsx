@@ -23,6 +23,10 @@ import EmotionalManipulationMeter from './components/EmotionalManipulationMeter'
 import ScriptFingerprintBadge from './components/ScriptFingerprintBadge';
 import CallerReputationBadge from './components/CallerReputationBadge';
 import TamperEvidentAuditModal from './components/TamperEvidentAuditModal';
+import ChannelSelector from './components/ChannelSelector';
+import ScreenShareAlertModal from './components/ScreenShareAlertModal';
+import PlatformCapabilityMatrixModal from './components/PlatformCapabilityMatrixModal';
+import VideoAnalysisVisualizer from './components/VideoAnalysisVisualizer';
 import {
   Mic, MicOff, Send, Radio, Sparkles, AlertCircle, RefreshCw, MessageSquarePlus,
   FileText, ShieldAlert, CheckCircle, Clock, GitCommit, UserCheck, Activity, Search,
@@ -31,8 +35,11 @@ import {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('live');
+  const [selectedChannel, setSelectedChannel] = useState('SIM_CALL');
   const [easyMode, setEasyMode] = useState(false);
   const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+  const [isCapabilitiesModalOpen, setIsCapabilitiesModalOpen] = useState(false);
+  const [isScreenShareAlertOpen, setIsScreenShareAlertOpen] = useState(false);
   const [language, setLanguage] = useState('en');
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
@@ -101,6 +108,13 @@ export default function App() {
     }
     return () => clearInterval(timerRef.current);
   }, [isRecording]);
+
+  // Emergency trigger for screen share coercion modal
+  useEffect(() => {
+    if (currentAnalysis?.screenShareAnalysis?.is_screen_share_demanded) {
+      setIsScreenShareAlertOpen(true);
+    }
+  }, [currentAnalysis?.screenShareAnalysis?.is_screen_share_demanded]);
 
   // Connect WebSocket for live call monitoring
   const connectWebSocket = () => {
@@ -202,15 +216,17 @@ export default function App() {
   };
 
   // Send manual speech phrase to backend
-  const handleSendManualSpeech = async (overrideText = null) => {
+  const handleSendManualSpeech = async (overrideText = null, overrideChannel = null) => {
     const textToSend = overrideText || manualInputText;
     if (!textToSend.trim()) return;
+
+    const channelToSend = overrideChannel || selectedChannel;
 
     try {
       const res = await fetch('http://localhost:8000/api/analyze-text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToSend })
+        body: JSON.stringify({ text: textToSend, channel: channelToSend })
       });
       const data = await res.json();
       setCurrentAnalysis(data);
@@ -310,12 +326,23 @@ export default function App() {
         onOpenEvaluation={() => setIsEvaluationOpen(true)}
         onOpenReport={handleOpenReport}
         onOpenAudit={() => setIsAuditModalOpen(true)}
+        onOpenCapabilities={() => setIsCapabilitiesModalOpen(true)}
       />
 
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px 24px', flex: 1, width: '100%' }}>
         {/* TAB 1: LIVE CALL MONITOR */}
         {activeTab === 'live' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Universal Communication Channel Selector & Platform Honesty Status */}
+            <ChannelSelector
+              selectedChannel={selectedChannel}
+              onSelectChannel={(ch) => {
+                setSelectedChannel(ch);
+                setCurrentAnalysis(prev => ({ ...prev, channel: ch }));
+              }}
+              capabilities={currentAnalysis.capabilities}
+            />
+
             {/* Top Operational Status Banner */}
             <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -394,6 +421,18 @@ export default function App() {
                   <PhoneOff className="w-4 h-4" /> DISCONNECT CALL
                 </button>
               </div>
+            )}
+
+            {/* Video Call & Visual Deepfake Shield (for Video Calls or when Visual Analysis Present) */}
+            {(selectedChannel === 'VIDEO_CALL' || currentAnalysis.videoAnalysisResult) && (
+              <VideoAnalysisVisualizer
+                videoResult={currentAnalysis.videoAnalysisResult || {
+                  visual_risk: selectedChannel === 'VIDEO_CALL' ? 15.0 : 0.0,
+                  confidence: 0.85,
+                  signals: [],
+                  is_extortion: false
+                }}
+              />
             )}
 
             {/* Caller Reputation & Script Fingerprint Chips */}
@@ -667,7 +706,11 @@ export default function App() {
           <DemoWalkthrough
             onSimulateStep={(accumulatedTranscript, stepConfig) => {
               setLiveTranscript(accumulatedTranscript);
-              handleSendManualSpeech(accumulatedTranscript);
+              const targetChannel = stepConfig?.channel || selectedChannel;
+              if (targetChannel !== selectedChannel) {
+                setSelectedChannel(targetChannel);
+              }
+              handleSendManualSpeech(accumulatedTranscript, targetChannel);
             }}
           />
         )}
@@ -696,6 +739,20 @@ export default function App() {
         onClose={() => setIsMobileModalOpen(false)}
         analysis={currentAnalysis}
         onEndCall={handleStopLiveCall}
+      />
+
+      {/* Screen Sharing Scam Intervention Alert Modal */}
+      <ScreenShareAlertModal
+        isOpen={isScreenShareAlertOpen}
+        onClose={() => setIsScreenShareAlertOpen(false)}
+        screenData={currentAnalysis.screenShareAnalysis}
+        onEndCall={handleStopLiveCall}
+      />
+
+      {/* Platform Capability & Technical Honesty Matrix Modal */}
+      <PlatformCapabilityMatrixModal
+        isOpen={isCapabilitiesModalOpen}
+        onClose={() => setIsCapabilitiesModalOpen(false)}
       />
 
       {/* User Feedback Loop Modal */}

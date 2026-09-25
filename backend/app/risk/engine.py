@@ -53,7 +53,9 @@ class DeterministicRiskEngine:
         evidence_items: List[EvidenceItem],
         evidence_risk: float = 0.0,
         prompt_injection_detected: bool = False,
-        is_insufficient_context: bool = False
+        is_insufficient_context: bool = False,
+        screen_share_risk: float = 0.0,
+        visual_risk: float = 0.0
     ) -> Tuple[int, int, RiskBreakdown, str, str, List[str], str, float]:
         """
         Computes (risk_score, trust_score, breakdown, classification, recommendation, actions, easy_summary, evidence_confidence).
@@ -94,6 +96,8 @@ class DeterministicRiskEngine:
         i_score = max(0.0, min(100.0, float(fraud_intent_risk)))
         id_score = max(0.0, min(100.0, float(identity_risk)))
         t_score = max(0.0, min(100.0, float(threat_risk)))
+        scr_score = max(0.0, min(100.0, float(screen_share_risk)))
+        vis_score = max(0.0, min(100.0, float(visual_risk)))
 
         # Derive evidence risk from grounded suspicious findings
         grounded_items = [e for e in evidence_items if getattr(e, "is_grounded_in_transcript", True)]
@@ -124,11 +128,23 @@ class DeterministicRiskEngine:
             (self.w_evidence * e_score)
         )
 
+        # Screen-share and Visual manipulation blending
+        if scr_score > 0:
+            weighted_risk = max(weighted_risk, (weighted_risk * 0.85) + (scr_score * 0.15))
+        if vis_score > 0:
+            weighted_risk = max(weighted_risk, (weighted_risk * 0.85) + (vis_score * 0.15))
+
         # Deterministic Safety Override: If a caller demands an OTP under urgency, risk cannot be low
         if has_otp_demand and has_urgency:
             weighted_risk = max(weighted_risk, 88.0)
         elif has_otp_demand:
             weighted_risk = max(weighted_risk, 75.0)
+
+        # Screen-Sharing Takeover Override (Section 9 & 21)
+        if scr_score >= 80.0:
+            weighted_risk = max(weighted_risk, 92.0)
+        elif scr_score >= 60.0:
+            weighted_risk = max(weighted_risk, 80.0)
 
         # Extortion / Digital Arrest / Law Enforcement Intimidation Override
         has_extortion_threat = any("arrest" in e.exact_phrase.lower() or "digital arrest" in e.exact_phrase.lower() for e in evidence_items)

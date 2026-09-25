@@ -27,6 +27,15 @@ from backend.app.services.emotion_engine import emotion_engine
 from backend.app.services.coaching import coaching_engine
 from backend.app.services.audit_logger import get_or_create_ledger
 from backend.app.services.multimodal_context import multimodal_engine
+from backend.app.communication.channel import (
+    CommunicationChannel,
+    get_default_capabilities_for_channel,
+    CallSessionMetadata
+)
+from backend.app.communication.adapters import get_platform_adapter
+from backend.app.services.screen_share_engine import screen_share_engine
+from backend.app.services.video_engine import video_analysis_engine
+from backend.app.services.url_analyzer import url_analyzer
 
 router = APIRouter(prefix="/api", tags=["Silent Witness API"])
 supervisor = SupervisorAgent()
@@ -49,7 +58,8 @@ def analyze_text(request: AnalyzeTextRequest, db: Session = Depends(get_db)):
     result = supervisor.process_conversation(
         transcript=request.text,
         voice_result=None,
-        is_provisional=False
+        is_provisional=False,
+        channel=request.channel or "SIM_CALL"
     )
     
     result.id = str(uuid.uuid4())
@@ -603,5 +613,115 @@ def get_scam_script_templates():
     Returns canonical scam script fingerprints and safe exit advice.
     """
     return SCAM_SCRIPT_TEMPLATES
+
+
+# Universal Call Safety Endpoints (SIM, WhatsApp, VoIP, Video, Screen-Share)
+
+@router.post("/calls/start")
+def start_call_session(payload: Dict[str, Any]):
+    """
+    Initializes a monitored communication session across any supported channel.
+    Reports honest platform capabilities and screening actions.
+    """
+    session_id = payload.get("session_id") or str(uuid.uuid4())
+    channel_str = payload.get("channel", "SIM_CALL")
+    try:
+        channel = CommunicationChannel(channel_str)
+    except Exception:
+        channel = CommunicationChannel.SIM_CALL
+
+    caller_number = payload.get("caller_number", "+91 98765 43210")
+    platform_name = payload.get("platform", "android_telecom")
+
+    adapter = get_platform_adapter(channel)
+    adapter.start_monitoring(session_id, payload)
+
+    # Perform pre-call screening for SIM / Online call
+    screening_result = None
+    if channel == CommunicationChannel.SIM_CALL and hasattr(adapter, "screen_incoming_call"):
+        screening_result = adapter.screen_incoming_call(caller_number)
+
+    capabilities = get_default_capabilities_for_channel(channel)
+
+    return {
+        "success": True,
+        "session_id": session_id,
+        "channel": channel.value,
+        "platform": platform_name,
+        "screening": screening_result,
+        "capabilities": capabilities.to_dict(),
+        "status": "MONITORING_ACTIVE"
+    }
+
+
+@router.post("/calls/end")
+def end_call_session(payload: Dict[str, Any]):
+    """
+    Concludes an active call session and triggers tamper-evident audit finalization.
+    """
+    session_id = payload.get("session_id", "default-session")
+    channel_str = payload.get("channel", "SIM_CALL")
+    try:
+        channel = CommunicationChannel(channel_str)
+    except Exception:
+        channel = CommunicationChannel.SIM_CALL
+
+    adapter = get_platform_adapter(channel)
+    adapter.stop_monitoring()
+
+    ledger = get_or_create_ledger(session_id)
+    ledger.add_block(
+        event_type="CALL_CONCLUDED",
+        data={"session_id": session_id, "channel": channel.value, "concluded_at": time.time()}
+    )
+
+    return {
+        "success": True,
+        "session_id": session_id,
+        "status": "SESSION_CONCLUDED",
+        "audit_integrity": ledger.verify_integrity()
+    }
+
+
+@router.post("/analyze/screen-share")
+def analyze_screen_sharing_coercion(payload: Dict[str, Any]):
+    """
+    Section 9 & 21: Detects screen-sharing solicitations and banking app exposure risks.
+    """
+    transcript = payload.get("transcript", "")
+    return screen_share_engine.analyze_text(transcript)
+
+
+@router.post("/analyze/video")
+def analyze_video_stream_context(payload: Dict[str, Any]):
+    """
+    Section 10 & 24: Analyzes video frames and extortion lure patterns.
+    """
+    transcript = payload.get("transcript", "")
+    frame_metadata = payload.get("frame_metadata")
+    return video_analysis_engine.analyze_video_context(transcript, frame_metadata)
+
+
+@router.post("/analyze/url")
+def analyze_suspicious_links(payload: Dict[str, Any]):
+    """
+    Section 22 & 23: Evaluates links or messages sent in conjunction with the call.
+    """
+    text = payload.get("message_text") or payload.get("url", "")
+    if payload.get("url") and not payload.get("message_text"):
+        return url_analyzer.analyze_url(payload.get("url"))
+    return url_analyzer.analyze_message_links(text)
+
+
+@router.get("/platforms/capabilities")
+def get_all_platform_capabilities():
+    """
+    Section 31: Returns the runtime platform capability matrix across all channels.
+    """
+    return {
+        c.value: get_default_capabilities_for_channel(c).to_dict()
+        for c in CommunicationChannel
+    }
+
 
 

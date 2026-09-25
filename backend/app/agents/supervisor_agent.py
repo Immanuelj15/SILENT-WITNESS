@@ -4,6 +4,9 @@ from backend.app.agents.intent_agent import IntentAgent
 from backend.app.agents.identity_agent import IdentityAgent
 from backend.app.agents.evidence_agent import EvidenceAgent
 from backend.app.agents.social_engineering_agent import SocialEngineeringAgent
+from backend.app.agents.screen_agent import screen_agent
+from backend.app.agents.video_agent import video_agent
+from backend.app.communication.channel import CommunicationChannel, get_default_capabilities_for_channel
 from backend.app.services.identity_verifier import caller_identity_verifier
 from backend.app.services.intent_chain import intent_chain_engine
 from backend.app.services.timeline import timeline_engine
@@ -41,6 +44,8 @@ class SupervisorAgent:
         self.identity_agent = IdentityAgent()
         self.evidence_agent = EvidenceAgent()
         self.social_engineering_agent = SocialEngineeringAgent()
+        self.screen_agent = screen_agent
+        self.video_agent = video_agent
         self.identity_verifier = caller_identity_verifier
         self.intent_chain_engine = intent_chain_engine
         self.timeline_engine = timeline_engine
@@ -103,7 +108,9 @@ class SupervisorAgent:
         session_id: Optional[str] = None,
         phone_number: Optional[str] = None,
         caller_is_contact: bool = False,
-        contact_name: Optional[str] = None
+        contact_name: Optional[str] = None,
+        channel: str = "SIM_CALL",
+        frame_metadata: Optional[Dict[str, Any]] = None
     ) -> AnalysisResult:
         # Step 0: Check for prompt injection attacks in transcript
         injection_check = detect_prompt_injection_attempt(transcript)
@@ -117,6 +124,8 @@ class SupervisorAgent:
         intent_res = self.intent_agent.analyze(transcript)
         identity_res = self.identity_agent.analyze(transcript)
         soc_eng_res = self.social_engineering_agent.analyze(transcript)
+        screen_res = self.screen_agent.analyze(transcript)
+        video_res = self.video_agent.analyze(transcript, frame_metadata)
 
         # Step 1.5: Verify caller identity claim against official registry
         identity_audit = self.identity_verifier.verify_caller_claim(
@@ -131,7 +140,9 @@ class SupervisorAgent:
             scam_res["proposed_evidence"] +
             intent_res["proposed_evidence"] +
             identity_res["proposed_evidence"] +
-            soc_eng_res.get("proposed_evidence", [])
+            soc_eng_res.get("proposed_evidence", []) +
+            screen_res.get("proposed_evidence", []) +
+            video_res.get("proposed_evidence", [])
         )
 
         # Step 3: Evidence Agent filters hallucinated or unsupported claims
@@ -170,7 +181,9 @@ class SupervisorAgent:
                 identity_risk=identity_risk_val,
                 threat_risk=scam_res["threat_score"],
                 evidence_items=grounded_evidence,
-                prompt_injection_detected=prompt_injection_detected
+                prompt_injection_detected=prompt_injection_detected,
+                screen_share_risk=screen_res["screen_share_risk"],
+                visual_risk=video_res["visual_risk"]
             )
         )
         evidence_confidence = getattr(breakdown, "evidence_confidence", 0.90)
@@ -182,9 +195,19 @@ class SupervisorAgent:
             identity_res["claimed_identity"],
             scam_res["detected_tactics"]
         )
+        if video_res.get("is_extortion"):
+            category = "VIDEO_EXTORTION"
+        elif screen_res.get("is_screen_share_demanded"):
+            category = "SCREEN_SHARE_SCAM"
 
         # Risk Factors extraction
         risk_factors = []
+        if screen_res.get("is_screen_share_demanded"):
+            risk_factors.append("Screen-Sharing Coercion Detected")
+            actions.insert(0, "STOP SCREEN SHARING IMMEDIATELY")
+        if video_res.get("is_extortion"):
+            risk_factors.append("Video Recording Extortion Pattern")
+            actions.insert(0, "DISCONNECT CAMERA & END CALL")
         if any("otp" in d.lower() for d in intent_res["demands"]):
             risk_factors.append("OTP / Credential Request")
         if any("pin" in d.lower() for d in intent_res["demands"]):
@@ -312,6 +335,13 @@ class SupervisorAgent:
         )
         audit_block_data = block.to_dict()
 
+        # Channel capabilities
+        try:
+            chan_enum = CommunicationChannel(channel)
+        except Exception:
+            chan_enum = CommunicationChannel.SIM_CALL
+        chan_caps = get_default_capabilities_for_channel(chan_enum).to_dict()
+
         return AnalysisResult(
             classification=classification,
             riskScore=risk_score,
@@ -343,5 +373,9 @@ class SupervisorAgent:
             emotionAnalysis=emotion_res,
             coaching=coaching_res,
             callerReputation=caller_rep,
-            auditBlock=audit_block_data
+            auditBlock=audit_block_data,
+            channel=chan_enum.value,
+            capabilities=chan_caps,
+            screenShareAnalysis=screen_res,
+            videoAnalysisResult=video_res
         )

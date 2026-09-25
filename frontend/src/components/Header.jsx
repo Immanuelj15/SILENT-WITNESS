@@ -13,7 +13,8 @@ export default function Header({
   onOpenKnowledgeBase = null,
   onOpenEvaluation = null,
   onOpenReport = null,
-  onOpenAudit = null
+  onOpenAudit = null,
+  onOpenCapabilities = null
 }) {
   const languages = [
     { code: 'en', label: 'English' },
@@ -117,6 +118,16 @@ export default function Header({
             title="View Real Empirical Model Metrics & Latencies"
           >
             📊 Evaluation
+          </button>
+
+          {/* Platform Capability Matrix */}
+          <button
+            onClick={onOpenCapabilities}
+            className="btn-secondary"
+            style={{ padding: '7px 10px', fontSize: '0.78rem' }}
+            title="Inspect Platform Limitations & Capability Matrix (SIM, WhatsApp, VoIP)"
+          >
+            🛡️ Capabilities
           </button>
 
           {/* Tamper-Evident Audit Ledger */}
