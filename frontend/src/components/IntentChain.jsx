@@ -54,31 +54,35 @@ export default function IntentChain({ intentChain }) {
       </div>
 
       {/* Visual Chain Flow */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-4 pt-1 custom-scrollbar">
+      <div className="flex items-center gap-3 overflow-x-auto pb-4 pt-1 custom-scrollbar">
         {stages.map((stg, idx) => {
           const isSelected = activeStage && activeStage.stage === stg.stage;
           return (
             <React.Fragment key={idx}>
               <div
                 onClick={() => setSelectedStage(stg)}
-                className={`flex-shrink-0 cursor-pointer p-3 rounded-lg border transition-all min-w-[150px] ${
+                className={`flex-shrink-0 cursor-pointer p-3.5 rounded-xl border transition-all min-w-[170px] shadow-md ${
                   isSelected
-                    ? 'bg-slate-800 border-emerald-500 ring-2 ring-emerald-500/30'
-                    : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                    ? 'bg-slate-800 border-emerald-500 ring-2 ring-emerald-500/40 shadow-emerald-500/10'
+                    : 'bg-slate-900/90 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
                 }`}
               >
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-mono text-slate-400">{stg.timestamp}s</span>
-                  <span className={`px-1.5 py-0.2 rounded border text-[10px] font-semibold ${getSeverityBadge(stg.severity)}`}>
+                <div className="flex items-center justify-between text-xs mb-1.5 gap-2">
+                  <span className="font-mono text-slate-400 bg-slate-950/80 px-1.5 py-0.5 rounded text-[10px]">
+                    T+{stg.timestamp}s
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold tracking-wider ${getSeverityBadge(stg.severity)}`}>
                     {stg.severity}
                   </span>
                 </div>
-                <div className="font-medium text-xs text-slate-200 line-clamp-1">{stg.title}</div>
-                <div className="text-[11px] text-slate-400 mt-1 truncate">"{stg.evidence[0]}"</div>
+                <div className="font-semibold text-xs text-slate-100 line-clamp-1">{stg.title}</div>
+                <div className="text-[11px] text-slate-400 mt-1 truncate italic">"{stg.evidence[0]}"</div>
               </div>
 
               {idx < stages.length - 1 && (
-                <ChevronRight className="w-4 h-4 text-slate-600 flex-shrink-0" />
+                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-400 shrink-0">
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </div>
               )}
             </React.Fragment>
           );

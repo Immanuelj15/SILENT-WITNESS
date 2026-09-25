@@ -21,20 +21,25 @@ export default function AttackTimeline({ timeline = [] }) {
   const activeSelected = selectedEvent || timeline[timeline.length - 1];
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 backdrop-blur-md">
+    <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-5 backdrop-blur-md shadow-xl">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-indigo-400" />
-          <h3 className="font-semibold text-slate-200">Conversation Attack Timeline</h3>
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <Clock className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-slate-100 text-sm">Conversation Attack Timeline</h3>
+            <p className="text-[11px] text-slate-400">Chronological forensic events with risk attribution</p>
+          </div>
         </div>
-        <span className="text-xs px-2.5 py-1 rounded-full bg-indigo-500/20 text-indigo-300 font-mono">
+        <span className="text-xs px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">
           {timeline.length} {timeline.length === 1 ? 'Event' : 'Events'} Logged
         </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Timeline Event Sequence */}
-        <div className="lg:col-span-7 space-y-3 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
+        <div className="lg:col-span-7 space-y-2.5 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
           {timeline.map((evt, idx) => {
             const isSelected = activeSelected && activeSelected.timestamp === evt.timestamp;
             const isHighRisk = evt.riskDelta >= 25;
@@ -43,33 +48,35 @@ export default function AttackTimeline({ timeline = [] }) {
               <div
                 key={idx}
                 onClick={() => setSelectedEvent(evt)}
-                className={`p-3 rounded-lg border transition-all cursor-pointer flex items-start gap-3 ${
+                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 shadow-sm ${
                   isSelected
-                    ? 'bg-slate-800/90 border-indigo-500 ring-1 ring-indigo-500/50'
-                    : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
+                    ? 'bg-slate-800/90 border-indigo-500 ring-1 ring-indigo-500/50 shadow-indigo-500/10'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900/80'
                 }`}
               >
                 <div className="mt-0.5">
-                  <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                    {evt.timeFormatted || `${Math.floor(evt.timestamp)}s`}
+                  <span className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-semibold block">
+                    {evt.timeFormatted || `T+${Math.floor(evt.timestamp)}s`}
                   </span>
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-slate-200 truncate">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-slate-100 truncate">
                       {evt.label || evt.eventType}
                     </span>
                     <span
-                      className={`text-xs font-mono font-semibold px-1.5 py-0.5 rounded ${
-                        isHighRisk ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                      className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${
+                        isHighRisk
+                          ? 'bg-red-500/20 text-red-300 border-red-500/40'
+                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                       }`}
                     >
                       {evt.riskContribution}
                     </span>
                   </div>
 
-                  <p className="text-xs text-slate-400 line-clamp-1 mt-1 font-sans italic">
+                  <p className="text-xs text-slate-300 line-clamp-1 mt-1 font-sans italic bg-slate-900/60 px-2 py-1 rounded border border-slate-800/60">
                     "{evt.evidence}"
                   </p>
                 </div>
