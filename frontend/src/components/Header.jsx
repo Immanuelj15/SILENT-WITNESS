@@ -1,185 +1,196 @@
 import React from 'react';
-import { Shield, Smartphone, Globe, Eye, Activity, Radio } from 'lucide-react';
+import {
+  Search,
+  Bell,
+  User,
+  Shield,
+  Menu,
+  CheckCircle2,
+  AlertTriangle,
+  SlidersHorizontal,
+  Globe,
+  Radio,
+  Sparkles
+} from 'lucide-react';
 
 export default function Header({
-  activeTab = 'live',
-  setActiveTab = null,
-  easyMode = false,
-  setEasyMode = null,
-  language = 'en',
-  setLanguage = null,
-  onOpenMobileView = null,
-  onOpenPrivacyCenter = null,
-  onOpenKnowledgeBase = null,
-  onOpenEvaluation = null,
-  onOpenReport = null,
-  onOpenAudit = null,
-  onOpenCapabilities = null
+  activeTab,
+  easyMode,
+  setEasyMode,
+  language,
+  setLanguage,
+  isRecording,
+  onMenuToggle,
 }) {
-  const languages = [
-    { code: 'en', label: 'English' },
-    { code: 'ta', label: 'தமிழ் (Tamil)' },
-    { code: 'hi', label: 'हिन्दी (Hindi)' },
-    { code: 'ml', label: 'മലയാളം (Malayalam)' },
-    { code: 'te', label: 'తెలుగు (Telugu)' },
-    { code: 'kn', label: 'ಕನ್ನಡ (Kannada)' },
-  ];
+  const getTabTitle = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return { title: 'Executive Overview', breadcrumb: 'Command Center / Global Telemetry' };
+      case 'live':
+        return { title: 'Live Voice & Screen Shield', breadcrumb: 'Active Operations / Real-Time Defense' };
+      case 'history':
+        return { title: 'Call Protection History', breadcrumb: 'Audit Trail / Forensic Records' };
+      case 'demos':
+        return { title: 'Scam Scenario Sandbox', breadcrumb: 'Intelligence / Attack Simulations' };
+      case 'intelligence':
+        return { title: 'Threat Intelligence Playbooks', breadcrumb: 'Knowledge Base / Fraud Signatures' };
+      case 'evaluation':
+        return { title: 'Model Evaluation Benchmarks', breadcrumb: 'Empirical Verification / Metrics' };
+      case 'ott':
+        return { title: 'WhatsApp & VoIP Safety Layer', breadcrumb: 'OTT Calling / Screen-Share Defense' };
+      case 'privacy':
+        return { title: 'Privacy & Data Governance', breadcrumb: 'Compliance / Zero-Storage Controls' };
+      case 'audit':
+        return { title: 'Cryptographic Audit Trail', breadcrumb: 'Forensics / SHA-256 Ledger' };
+      case 'capabilities':
+        return { title: 'Platform Capabilities Matrix', breadcrumb: 'Architecture / Channel Sandboxing' };
+      case 'settings':
+        return { title: 'System Administration', breadcrumb: 'Configuration / Safety Parameters' };
+      default:
+        return { title: 'Command Center', breadcrumb: 'Dashboard' };
+    }
+  };
+
+  const { title, breadcrumb } = getTabTitle();
 
   return (
-    <header style={{
-      borderBottom: '1px solid rgba(56, 189, 248, 0.15)',
-      background: 'rgba(7, 11, 20, 0.85)',
-      backdropFilter: 'blur(16px)',
-      position: 'sticky',
-      top: 0,
-      zIndex: 1000,
-      padding: '12px 24px'
-    }}>
-      <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '14px' }}>
-        {/* Brand identity */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: '12px',
-            background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
+    <header className="app-header">
+      {/* Left: Mobile Drawer Trigger + Breadcrumb + Page Title */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <button
+          onClick={onMenuToggle}
+          className="btn-ghost"
+          style={{ padding: '6px', display: 'none' }}
+          id="mobile-menu-btn"
+          aria-label="Toggle navigation menu"
+        >
+          <Menu size={20} />
+        </button>
+
+        <div>
+          <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', fontWeight: 500, letterSpacing: '-0.01em' }}>
+            {breadcrumb}
+          </div>
+          <h1 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
+            {title}
+          </h1>
+        </div>
+      </div>
+
+      {/* Right: Search, Global Live Status, Controls & Profile */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Search Input with ⌘K Badge */}
+        <div style={{ position: 'relative', width: '240px' }} className="desktop-search">
+          <Search size={14} style={{ position: 'absolute', left: '11px', top: '10px', color: 'var(--text-muted)' }} />
+          <input
+            type="text"
+            placeholder="Search threats, calls..."
+            className="sw-input"
+            style={{ paddingLeft: '32px', paddingRight: '48px', height: '34px', fontSize: '12.5px', borderRadius: '8px' }}
+          />
+          <span
+            style={{
+              position: 'absolute',
+              right: '8px',
+              top: '7px',
+              fontSize: '10px',
+              fontWeight: 700,
+              padding: '2px 5px',
+              borderRadius: '4px',
+              backgroundColor: '#F1F5F9',
+              color: '#64748B',
+              border: '1px solid #E2E8F0',
+              fontFamily: 'monospace',
+            }}
+          >
+            ⌘K
+          </span>
+        </div>
+
+        {/* Live Defense Status Badge */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '7px',
+            padding: '5px 11px',
+            borderRadius: '999px',
+            backgroundColor: isRecording ? 'var(--warning-bg)' : 'var(--success-bg)',
+            border: `1px solid ${isRecording ? 'var(--warning-border)' : 'var(--success-border)'}`,
+            fontSize: '12px',
+            fontWeight: 700,
+            color: isRecording ? 'var(--warning-text)' : 'var(--success-text)',
+            letterSpacing: '-0.01em',
+          }}
+        >
+          <span className={`status-dot ${isRecording ? 'status-dot-warning' : 'status-dot-active'}`} />
+          <span>{isRecording ? 'Call In Progress' : 'Protection Active'}</span>
+        </div>
+
+        {/* Simple Mode Toggle */}
+        <button
+          onClick={() => setEasyMode(!easyMode)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 12px',
+            borderRadius: '8px',
+            border: '1px solid var(--border)',
+            backgroundColor: easyMode ? 'var(--primary)' : 'var(--surface)',
+            color: easyMode ? '#FFFFFF' : 'var(--text-secondary)',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+          }}
+          title="Toggle High-Contrast Senior Accessibility Mode"
+        >
+          <SlidersHorizontal size={13} />
+          <span>{easyMode ? 'Simple View: ON' : 'Simple View'}</span>
+        </button>
+
+        {/* Language Selector */}
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+          style={{
+            padding: '6px 9px',
+            borderRadius: '8px',
+            border: '1px solid var(--border)',
+            backgroundColor: 'var(--surface)',
+            color: 'var(--text-secondary)',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            outline: 'none',
+          }}
+        >
+          <option value="en">English (US)</option>
+          <option value="ta">தமிழ் (Tamil)</option>
+          <option value="hi">हिंदी (Hindi)</option>
+        </select>
+
+        {/* User Profile Avatar */}
+        <div
+          style={{
+            width: '34px',
+            height: '34px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)',
+            border: '1.5px solid #BFDBFE',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 0 20px rgba(6, 182, 212, 0.45)'
-          }}>
-            <Shield size={24} color="#ffffff" />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em', color: '#f8fafc' }}>
-                SILENT WITNESS
-              </h1>
-              <span className="badge badge-safe" style={{ fontSize: '0.65rem', padding: '2px 8px' }}>
-                <span className="radar-dot" style={{ width: '6px', height: '6px' }} />
-                ACTIVE SAFETY
-              </span>
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-              "Don't trust the voice. Verify the conversation."
-            </div>
-          </div>
-        </div>
-
-        {/* Tab Navigation */}
-        <nav style={{ display: 'flex', gap: '6px', background: 'rgba(15, 23, 42, 0.8)', padding: '4px', borderRadius: '12px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-          <button
-            onClick={() => setActiveTab('live')}
-            className={activeTab === 'live' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '7px 12px', fontSize: '0.82rem' }}
-          >
-            <Radio size={14} /> Live Call
-          </button>
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={activeTab === 'upload' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '7px 12px', fontSize: '0.82rem' }}
-          >
-            Upload Audio
-          </button>
-          <button
-            onClick={() => setActiveTab('demo')}
-            className={activeTab === 'demo' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '7px 12px', fontSize: '0.82rem' }}
-          >
-            Scam Demos
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={activeTab === 'history' ? 'btn-primary' : 'btn-secondary'}
-            style={{ padding: '7px 12px', fontSize: '0.82rem' }}
-          >
-            History
-          </button>
-        </nav>
-
-        {/* Subsystem Tool Modals & Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {/* Scam Knowledge Base */}
-          <button
-            onClick={onOpenKnowledgeBase}
-            className="btn-secondary"
-            style={{ padding: '7px 10px', fontSize: '0.78rem' }}
-            title="Browse 17 Scam Categories & Attack Vectors"
-          >
-            📚 Knowledge Base
-          </button>
-
-          {/* Evaluation Dashboard */}
-          <button
-            onClick={onOpenEvaluation}
-            className="btn-secondary"
-            style={{ padding: '7px 10px', fontSize: '0.78rem' }}
-            title="View Real Empirical Model Metrics & Latencies"
-          >
-            📊 Evaluation
-          </button>
-
-          {/* Platform Capability Matrix */}
-          <button
-            onClick={onOpenCapabilities}
-            className="btn-secondary"
-            style={{ padding: '7px 10px', fontSize: '0.78rem' }}
-            title="Inspect Platform Limitations & Capability Matrix (SIM, WhatsApp, VoIP)"
-          >
-            🛡️ Capabilities
-          </button>
-
-          {/* Tamper-Evident Audit Ledger */}
-          <button
-            onClick={onOpenAudit}
-            className="btn-secondary"
-            style={{ padding: '7px 10px', fontSize: '0.78rem' }}
-            title="Inspect Cryptographic SHA-256 Tamper-Evident Audit Chain"
-          >
-            ⛓️ Audit Ledger
-          </button>
-
-          {/* Privacy Center */}
-          <button
-            onClick={onOpenPrivacyCenter}
-            className="btn-secondary"
-            style={{ padding: '7px 10px', fontSize: '0.78rem' }}
-            title="Privacy Center & Data Wipe Controls"
-          >
-            🔒 Privacy
-          </button>
-
-          {/* Mobile phone simulation toggle */}
-          <button
-            onClick={onOpenMobileView}
-            className="btn-secondary"
-            style={{ padding: '7px 10px', fontSize: '0.78rem' }}
-            title="Open Mobile Call Simulation Overlay"
-          >
-            <Smartphone size={14} /> Mobile
-          </button>
-
-          {/* Easy Mode toggle */}
-          <button
-            onClick={() => setEasyMode(!easyMode)}
-            style={{
-              padding: '7px 11px',
-              borderRadius: '10px',
-              fontSize: '0.78rem',
-              fontWeight: 700,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '5px',
-              border: easyMode ? '2px solid #34d399' : '1px solid var(--border-glass)',
-              background: easyMode ? 'rgba(16, 185, 129, 0.2)' : 'rgba(30, 41, 59, 0.7)',
-              color: easyMode ? '#34d399' : 'var(--text-secondary)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <Eye size={14} /> {easyMode ? 'Easy ON' : 'Easy Mode'}
-          </button>
+            color: 'var(--primary)',
+            fontWeight: 800,
+            fontSize: '12px',
+            letterSpacing: '0.04em',
+            boxShadow: 'var(--shadow-xs)',
+          }}
+          title="Enterprise Security Administrator"
+        >
+          SA
         </div>
       </div>
     </header>

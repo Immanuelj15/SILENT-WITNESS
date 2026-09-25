@@ -1,110 +1,144 @@
 import React, { useState } from 'react';
-import { GitCommit, ShieldAlert, CheckCircle, ChevronRight, AlertCircle, Info } from 'lucide-react';
+import { GitCommit, ShieldAlert, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
 
 export default function IntentChain({ intentChain }) {
   const [selectedStage, setSelectedStage] = useState(null);
 
-  if (!intentChain || !intentChain.stages || intentChain.stages.length === 0) {
-    return (
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 backdrop-blur-md">
-        <div className="flex items-center gap-2 mb-3">
-          <GitCommit className="w-5 h-5 text-emerald-400" />
-          <h3 className="font-semibold text-slate-200">Scam Intent Chain (Attack Progression)</h3>
-        </div>
-        <p className="text-sm text-slate-400 italic">
-          Monitoring dialogue progression... Multi-stage scam attack vectors will link here.
-        </p>
-      </div>
+  // Standard 5-stage scam progression model
+  const defaultStages = [
+    { stage: 'IDENTITY_CLAIM', label: 'Identity Claim', detected: false, severity: 'LOW' },
+    { stage: 'TRUST_BUILDING', label: 'Trust Building', detected: false, severity: 'LOW' },
+    { stage: 'URGENCY', label: 'Urgency & Pressure', detected: false, severity: 'MEDIUM' },
+    { stage: 'CREDENTIAL_REQUEST', label: 'Credential Request', detected: false, severity: 'HIGH' },
+    { stage: 'PAYMENT_REQUEST', label: 'Payment / Coercion', detected: false, severity: 'CRITICAL' },
+  ];
+
+  // Merge detected stages from prop if available
+  const stages = defaultStages.map((defaultStg) => {
+    const match = intentChain?.stages?.find(
+      (s) => (s.stage || '').toUpperCase() === defaultStg.stage
     );
-  }
-
-  const { stages, progressionState, isFullAttackChain } = intentChain;
-  const activeStage = selectedStage || stages[stages.length - 1];
-
-  const getSeverityBadge = (severity) => {
-    switch (severity) {
-      case 'CRITICAL':
-        return 'bg-red-500/20 text-red-400 border-red-500/30';
-      case 'HIGH':
-        return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
-      case 'MEDIUM':
-        return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      default:
-        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    if (match) {
+      return {
+        ...defaultStg,
+        detected: true,
+        severity: match.severity || defaultStg.severity,
+        explanation: match.explanation,
+        evidenceSnippet: match.evidenceSnippet,
+      };
     }
-  };
+    return defaultStg;
+  });
+
+  const activeStage = selectedStage || stages.find((s) => s.detected) || stages[0];
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 backdrop-blur-md">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div className="flex items-center gap-2">
-          <GitCommit className="w-5 h-5 text-emerald-400" />
-          <h3 className="font-semibold text-slate-200">Scam Intent Chain (Attack Progression)</h3>
+    <div className="sw-card" style={{ padding: '20px 24px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
+            <GitCommit size={16} />
+          </div>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Scam Intent Progression Chain
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Multi-turn social-engineering progression and escalation path
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {isFullAttackChain && (
-            <span className="text-xs px-2.5 py-1 rounded bg-red-500/20 border border-red-500/40 text-red-300 font-bold uppercase tracking-wider animate-pulse flex items-center gap-1">
-              <ShieldAlert className="w-3.5 h-3.5" /> Full Attack Chain Identified
-            </span>
-          )}
-          <span className="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">
-            Phase: {progressionState.replace(/_/g, ' ')}
+
+        {intentChain?.isFullAttackChain && (
+          <span className="badge badge-danger">
+            <ShieldAlert size={12} />
+            <span>Full Attack Chain Identified</span>
           </span>
-        </div>
+        )}
       </div>
 
-      {/* Visual Chain Flow */}
-      <div className="flex items-center gap-3 overflow-x-auto pb-4 pt-1 custom-scrollbar">
+      {/* Horizontal Chain Flow */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          overflowX: 'auto',
+          paddingBottom: '12px',
+        }}
+      >
         {stages.map((stg, idx) => {
-          const isSelected = activeStage && activeStage.stage === stg.stage;
+          const isSelected = activeStage?.stage === stg.stage;
+          const isDetected = stg.detected;
+          const isDanger = stg.severity === 'CRITICAL' || stg.severity === 'HIGH';
+
           return (
-            <React.Fragment key={idx}>
+            <React.Fragment key={stg.stage}>
               <div
                 onClick={() => setSelectedStage(stg)}
-                className={`flex-shrink-0 cursor-pointer p-3.5 rounded-xl border transition-all min-w-[170px] shadow-md ${
-                  isSelected
-                    ? 'bg-slate-800 border-emerald-500 ring-2 ring-emerald-500/40 shadow-emerald-500/10'
-                    : 'bg-slate-900/90 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
-                }`}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                  backgroundColor: isDetected
+                    ? isDanger ? 'var(--danger-bg)' : 'var(--warning-bg)'
+                    : 'var(--surface)',
+                  color: isDetected
+                    ? isDanger ? 'var(--danger-text)' : 'var(--warning-text)'
+                    : 'var(--text-muted)',
+                  cursor: 'pointer',
+                  minWidth: '130px',
+                  textAlign: 'center',
+                  transition: 'all 0.15s ease',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
               >
-                <div className="flex items-center justify-between text-xs mb-1.5 gap-2">
-                  <span className="font-mono text-slate-400 bg-slate-950/80 px-1.5 py-0.5 rounded text-[10px]">
-                    T+{stg.timestamp}s
-                  </span>
-                  <span className={`px-2 py-0.5 rounded-full border text-[10px] font-bold tracking-wider ${getSeverityBadge(stg.severity)}`}>
-                    {stg.severity}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', marginBottom: '4px' }}>
+                  <span className={`status-dot ${isDetected ? (isDanger ? 'status-dot-danger' : 'status-dot-warning') : ''}`} style={{ backgroundColor: isDetected ? undefined : '#CBD5E1' }} />
+                  <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase' }}>
+                    Stage {idx + 1}
                   </span>
                 </div>
-                <div className="font-semibold text-xs text-slate-100 line-clamp-1">{stg.title}</div>
-                <div className="text-[11px] text-slate-400 mt-1 truncate italic">"{stg.evidence[0]}"</div>
+                <div style={{ fontSize: '12px', fontWeight: 600 }}>
+                  {stg.label}
+                </div>
               </div>
 
               {idx < stages.length - 1 && (
-                <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-400 shrink-0">
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </div>
+                <ArrowRight size={16} style={{ color: '#CBD5E1', flexShrink: 0 }} />
               )}
             </React.Fragment>
           );
         })}
       </div>
 
-      {/* Stage Detail Card */}
+      {/* Stage Detail Explanation */}
       {activeStage && (
-        <div className="mt-2 bg-slate-950/70 border border-slate-800 rounded-lg p-3 text-xs">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="font-semibold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-              <Info className="w-3.5 h-3.5" /> Stage Detail: {activeStage.title}
+        <div
+          style={{
+            marginTop: '12px',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            backgroundColor: 'var(--bg-main)',
+            border: '1px solid var(--border)',
+            fontSize: '12px',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          <strong style={{ color: 'var(--text-primary)' }}>{activeStage.label}: </strong>
+          {activeStage.detected ? (
+            <span>
+              {activeStage.explanation || 'Signal detected in spoken conversation turns.'}
+              {activeStage.evidenceSnippet && (
+                <span style={{ fontStyle: 'italic', display: 'block', marginTop: '4px' }}>
+                  Matched: "{activeStage.evidenceSnippet}"
+                </span>
+              )}
             </span>
-            <span className="text-slate-400 font-mono">Confidence: {Math.round(activeStage.confidence * 100)}%</span>
-          </div>
-          <p className="text-slate-300 mb-2 leading-relaxed">{activeStage.description}</p>
-          <div className="bg-slate-900/80 p-2 rounded border border-slate-800 font-mono text-amber-200">
-            <span className="text-slate-400">Supporting Evidence: </span>
-            {activeStage.evidence.map((ev, i) => (
-              <span key={i}>"{ev}" </span>
-            ))}
-          </div>
+          ) : (
+            <span>No indicators detected for this stage yet in the current conversation.</span>
+          )}
         </div>
       )}
     </div>

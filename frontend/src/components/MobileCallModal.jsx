@@ -1,197 +1,234 @@
 import React from 'react';
-import { Phone, PhoneOff, Shield, ShieldAlert, AlertTriangle, X, Volume2 } from 'lucide-react';
+import { PhoneOff, Shield, AlertTriangle, X, CheckCircle2, UserCheck } from 'lucide-react';
 
 export default function MobileCallModal({ isOpen = false, onClose = null, analysis = null, onEndCall = null }) {
   if (!isOpen) return null;
 
-  const trustScore = analysis?.trustScore ?? 100;
-  const isHighDanger = trustScore < 40;
-  const isSuspicious = trustScore >= 40 && trustScore < 70;
-
-  let bannerClass = 'badge-safe';
-  let bannerText = '🟢 SAFE CONVERSATION';
-  if (isHighDanger) {
-    bannerClass = 'badge-danger';
-    bannerText = '🔴 HIGH DANGER — LIKELY SCAM';
-  } else if (isSuspicious) {
-    bannerClass = 'badge-warn';
-    bannerText = '🟠 BE CAREFUL — SUSPICIOUS';
-  }
+  const trustScore = analysis?.trustScore ?? 42;
+  const isHighDanger = trustScore < 50;
+  const isSuspicious = trustScore >= 50 && trustScore < 80;
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(3, 7, 18, 0.85)',
-      backdropFilter: 'blur(10px)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 9999,
-      padding: '16px'
-    }}>
-      {/* Mobile Device Frame */}
-      <div style={{
-        width: '100%',
-        maxWidth: '380px',
-        height: '680px',
-        backgroundColor: '#0b1120',
-        borderRadius: '40px',
-        border: '3px solid rgba(255, 255, 255, 0.15)',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 35px rgba(6, 182, 212, 0.2)',
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.6)',
+        backdropFilter: 'blur(5px)',
         display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
-        {/* Mobile Speaker Notch */}
-        <div style={{
-          position: 'absolute',
-          top: '12px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '120px',
-          height: '24px',
-          backgroundColor: '#030712',
-          borderRadius: '16px',
-          zIndex: 10
-        }} />
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 9999,
+        padding: '16px',
+      }}
+    >
+      {/* Modern Android Phone Frame */}
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '380px',
+          height: '720px',
+          backgroundColor: '#FFFFFF',
+          borderRadius: '44px',
+          border: '12px solid #0F172A',
+          boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.4)',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          overflow: 'hidden',
+          fontFamily: "'Inter', sans-serif",
+        }}
+      >
+        {/* Notch / Punch-hole Camera */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '12px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: '14px',
+            height: '14px',
+            backgroundColor: '#0F172A',
+            borderRadius: '50%',
+            zIndex: 10,
+          }}
+        />
 
         {/* Close Modal button */}
         <button
           onClick={onClose}
           style={{
             position: 'absolute',
-            top: '20px',
-            right: '20px',
-            background: 'transparent',
+            top: '16px',
+            right: '16px',
+            background: 'none',
             border: 'none',
-            color: '#94a3b8',
+            color: '#64748B',
             cursor: 'pointer',
-            zIndex: 20
+            zIndex: 20,
+            padding: '4px',
           }}
         >
-          <X size={20} />
+          <X size={18} />
         </button>
 
-        {/* Mobile Call Content */}
-        <div style={{ padding: '48px 24px 24px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          {/* Caller Identity */}
+        {/* Phone Content Area */}
+        <div
+          style={{
+            flex: 1,
+            backgroundColor: '#F8FAFC',
+            padding: '48px 24px 28px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+        >
+          {/* Top Brand Banner */}
           <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width: '72px',
-              height: '72px',
-              borderRadius: '50%',
-              backgroundColor: isHighDanger ? 'rgba(239, 68, 68, 0.2)' : 'rgba(6, 182, 212, 0.2)',
-              border: isHighDanger ? '2px solid #ef4444' : '2px solid #06b6d4',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 12px'
-            }}>
-              <Phone size={32} color={isHighDanger ? '#ef4444' : '#06b6d4'} />
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#2563EB', fontWeight: 800, fontSize: '12px', letterSpacing: '0.06em' }}>
+              <Shield size={14} />
+              <span>SILENT WITNESS</span>
             </div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f8fafc' }}>
+            <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
+              AI Real-Time Call Protection
+            </div>
+          </div>
+
+          {/* Caller Identity Section */}
+          <div style={{ textAlign: 'center', margin: '20px 0' }}>
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                backgroundColor: '#EFF6FF',
+                border: '2px solid #BFDBFE',
+                color: '#2563EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+                fontSize: '22px',
+                fontWeight: 700,
+              }}
+            >
+              ?
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', marginBottom: '4px' }}>
               Unknown Caller
+            </h3>
+            <div style={{ fontSize: '13px', color: '#64748B', fontFamily: 'monospace' }}>
+              +91 98765 43210
             </div>
-            <div style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
-              +91 (Unverified Inbound Voice)
-            </div>
-          </div>
-
-          {/* Real-time Safety Layer Status */}
-          <div style={{ textAlign: 'center', margin: '14px 0' }}>
-            <div className={`badge ${bannerClass}`} style={{ fontSize: '0.88rem', padding: '6px 16px', marginBottom: '12px' }}>
-              {bannerText}
-            </div>
-
-            <div style={{
-              fontSize: '3.6rem',
-              fontWeight: 800,
-              color: isHighDanger ? '#ef4444' : isSuspicious ? '#f59e0b' : '#10b981',
-              lineHeight: 1
-            }}>
-              {trustScore}
-            </div>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', letterSpacing: '0.1em' }}>
-              TRUST SCORE
+            <div style={{ fontSize: '11px', color: '#B45309', fontWeight: 600, marginTop: '4px' }}>
+              Unverified Inbound Contact
             </div>
           </div>
 
-          {/* Transcript Snippet & Danger Tags */}
-          <div style={{
-            background: 'rgba(15, 23, 42, 0.8)',
-            padding: '14px',
-            borderRadius: '16px',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
-            maxHeight: '130px',
-            overflowY: 'auto'
-          }}>
-            <div style={{ fontSize: '0.72rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700, marginBottom: '6px' }}>
-              Live Transcript
-            </div>
-            <div style={{ fontSize: '0.85rem', fontStyle: 'italic', color: '#e2e8f0', marginBottom: '8px' }}>
-              "{analysis?.transcript?.slice(-120) || 'Listening to caller...'}"
+          {/* Safety Status Card (Section 26) */}
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              border: `1.5px solid ${isHighDanger ? '#FECACA' : '#FDE68A'}`,
+              borderRadius: '16px',
+              padding: '16px',
+              boxShadow: '0 4px 6px -1px rgba(15, 23, 42, 0.05)',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#64748B' }}>
+              CURRENT TRUST SCORE
             </div>
 
-            {/* Risk Factors Badges */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {analysis?.riskFactors?.map((rf, i) => (
-                <span key={i} style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.25)', color: '#fca5a5', fontWeight: 600 }}>
-                  ⚠ {rf}
-                </span>
-              ))}
+            <div style={{ fontSize: '32px', fontWeight: 900, color: isHighDanger ? '#DC2626' : '#F59E0B', margin: '4px 0' }}>
+              {trustScore} <span style={{ fontSize: '14px', color: '#94A3B8' }}>/ 100</span>
+            </div>
+
+            <div
+              style={{
+                display: 'inline-block',
+                padding: '3px 12px',
+                borderRadius: '999px',
+                backgroundColor: isHighDanger ? '#FEF2F2' : '#FFFBEB',
+                color: isHighDanger ? '#DC2626' : '#B45309',
+                fontSize: '11px',
+                fontWeight: 800,
+                letterSpacing: '0.04em',
+                marginBottom: '10px',
+              }}
+            >
+              {isHighDanger ? 'HIGH RISK' : 'GUARDED'}
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                fontSize: '12px',
+                fontWeight: 700,
+                color: '#DC2626',
+                marginBottom: '6px',
+              }}
+            >
+              <AlertTriangle size={14} />
+              <span>⚠ OTP request detected</span>
+            </div>
+
+            <div style={{ fontSize: '12px', color: '#0F172A', fontWeight: 500 }}>
+              Recommended: <strong>Do not share OTP.</strong>
             </div>
           </div>
 
-          {/* Large Action Buttons */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '16px' }}>
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
             <button
               onClick={() => {
                 if (onEndCall) onEndCall();
-                onClose();
+                if (onClose) onClose();
               }}
               style={{
-                height: '60px',
-                borderRadius: '18px',
-                background: '#dc2626',
-                color: '#ffffff',
+                width: '100%',
+                padding: '13px',
+                backgroundColor: '#DC2626',
+                color: '#FFFFFF',
                 border: 'none',
-                fontWeight: 700,
-                fontSize: '1rem',
+                borderRadius: '12px',
+                fontSize: '14px',
+                fontWeight: 800,
+                letterSpacing: '0.04em',
+                cursor: 'pointer',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer',
-                boxShadow: '0 4px 15px rgba(220, 38, 38, 0.4)'
+                gap: '8px',
               }}
             >
-              <PhoneOff size={20} />
-              END CALL
+              <PhoneOff size={16} />
+              <span>END CALL</span>
             </button>
 
             <button
-              onClick={() => {
-                alert("Please call the official phone number printed on the back of your bank debit card or visit the branch directly.");
-              }}
+              onClick={onClose}
               style={{
-                height: '60px',
-                borderRadius: '18px',
-                background: '#1e293b',
-                color: '#38bdf8',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
+                width: '100%',
+                padding: '11px',
+                backgroundColor: '#FFFFFF',
+                color: '#2563EB',
+                border: '1.5px solid #BFDBFE',
+                borderRadius: '12px',
+                fontSize: '13px',
                 fontWeight: 700,
-                fontSize: '0.95rem',
+                cursor: 'pointer',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                cursor: 'pointer'
+                gap: '6px',
               }}
             >
-              <Shield size={20} />
-              VERIFY CALLER
+              <UserCheck size={16} />
+              <span>VERIFY CALLER</span>
             </button>
           </div>
         </div>

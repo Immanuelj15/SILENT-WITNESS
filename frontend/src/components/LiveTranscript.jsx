@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { MessageSquare, User, PhoneCall, ListFilter } from 'lucide-react';
+import { MessageSquare, PhoneCall, User, ShieldAlert, AlertTriangle, ShieldCheck, ListFilter } from 'lucide-react';
 
 export default function LiveTranscript({
   transcript = '',
@@ -7,10 +7,10 @@ export default function LiveTranscript({
   evidence = [],
   suspiciousPhrases = [],
   isProvisional = false,
-  easyMode = false
+  easyMode = false,
 }) {
   const scrollRef = useRef(null);
-  const [viewMode, setViewMode] = useState('turns'); // 'turns' or 'raw'
+  const [viewMode, setViewMode] = useState('chat'); // 'chat' or 'plain'
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -18,143 +18,184 @@ export default function LiveTranscript({
     }
   }, [transcript, dialogueTurns]);
 
-  const highlightPhraseInText = (text) => {
-    if (!evidence || evidence.length === 0) return text;
-    const sorted = [...evidence].sort((a, b) => b.exact_phrase.length - a.exact_phrase.length);
+  // Turn raw transcript text into dialogue items if dialogueTurns is not provided
+  const turns = (dialogueTurns && dialogueTurns.length > 0)
+    ? dialogueTurns
+    : transcript
+      ? [
+          {
+            speaker: 'CALLER',
+            text: transcript,
+            timestamp_offset: 0,
+          },
+        ]
+      : [];
 
-    let parts = [{ text, isFlagged: false, tag: null }];
+  const getTurnSecurityAlert = (turnText) => {
+    if (!turnText) return null;
+    const lower = turnText.toLowerCase();
 
-    sorted.forEach(item => {
-      const phrase = item.exact_phrase;
-      if (!phrase) return;
-
-      const nextParts = [];
-      parts.forEach(part => {
-        if (part.isFlagged) {
-          nextParts.push(part);
-          return;
-        }
-
-        const idx = part.text.toLowerCase().indexOf(phrase.toLowerCase());
-        if (idx === -1) {
-          nextParts.push(part);
-        } else {
-          const before = part.text.substring(0, idx);
-          const matched = part.text.substring(idx, idx + phrase.length);
-          const after = part.text.substring(idx + phrase.length);
-
-          if (before) nextParts.push({ text: before, isFlagged: false, tag: null });
-          nextParts.push({ text: matched, isFlagged: true, tag: item.detected_tag });
-          if (after) nextParts.push({ text: after, isFlagged: false, tag: null });
-        }
-      });
-      parts = nextParts;
-    });
-
-    return parts.map((p, i) => {
-      if (!p.isFlagged) return <span key={i}>{p.text}</span>;
-      let className = 'highlight-claim';
-      const lt = (p.tag || '').toLowerCase();
-      if (lt.includes('otp') || lt.includes('pin') || lt.includes('credential')) {
-        className = 'highlight-credential';
-      } else if (lt.includes('threat') || lt.includes('urgency') || lt.includes('scam')) {
-        className = 'highlight-threat';
-      }
-      return <mark key={i} className={className} title={p.tag}>{p.text}</mark>;
-    });
+    if (lower.includes('otp') || lower.includes('pin') || lower.includes('password') || lower.includes('cvv')) {
+      return {
+        severity: 'danger',
+        label: 'Sensitive credential request detected',
+        border: 'var(--danger)',
+      };
+    }
+    if (lower.includes('screen') && (lower.includes('share') || lower.includes('anydesk') || lower.includes('teamviewer'))) {
+      return {
+        severity: 'critical',
+        label: 'Screen sharing / remote access coercion detected',
+        border: 'var(--critical)',
+      };
+    }
+    if (lower.includes('bank') || lower.includes('police') || lower.includes('customs') || lower.includes('arrest') || lower.includes('blocked')) {
+      return {
+        severity: 'warning',
+        label: 'Authority / urgency impersonation signal detected',
+        border: 'var(--warning)',
+      };
+    }
+    return null;
   };
 
   return (
-    <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+    <div className="sw-card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* Card Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <MessageSquare size={18} color="var(--accent-indigo)" />
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Live Speech Transcript (Diarized)
-          </span>
+          <div style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
+            <MessageSquare size={16} />
+          </div>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Live Conversation Transcript
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Real-time speaker diarization with inline AI fraud annotation
+            </div>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <button
-            onClick={() => setViewMode(viewMode === 'turns' ? 'raw' : 'turns')}
-            className="btn-secondary"
-            style={{ padding: '3px 8px', fontSize: '0.72rem' }}
-          >
-            <ListFilter size={12} /> {viewMode === 'turns' ? 'Diarized Turns' : 'Raw Stream'}
-          </button>
-        </div>
+
+        <button
+          onClick={() => setViewMode(viewMode === 'chat' ? 'plain' : 'chat')}
+          className="btn-ghost"
+          style={{ fontSize: '12px', padding: '4px 8px' }}
+        >
+          <ListFilter size={13} />
+          <span>{viewMode === 'chat' ? 'Chat View' : 'Raw Text'}</span>
+        </button>
       </div>
 
-      {/* Transcript container */}
+      {/* Main Transcript Body */}
       <div
         ref={scrollRef}
         style={{
           flex: 1,
-          minHeight: '150px',
-          maxHeight: '270px',
+          minHeight: '220px',
+          maxHeight: '340px',
           overflowY: 'auto',
-          background: 'rgba(9, 14, 26, 0.75)',
-          padding: '14px',
-          borderRadius: '12px',
-          border: '1px solid rgba(255, 255, 255, 0.06)',
-          fontSize: easyMode ? '1.15rem' : '0.92rem',
-          lineHeight: 1.6,
-          color: '#e2e8f0'
+          backgroundColor: 'var(--bg-main)',
+          border: '1px solid var(--border)',
+          borderRadius: '8px',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
         }}
       >
-        {!transcript && (!dialogueTurns || dialogueTurns.length === 0) ? (
-          <div style={{ color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'center', padding: '30px 0' }}>
-            Listening to live speech stream... Speaker-labeled transcription turns will appear in real time.
-          </div>
-        ) : viewMode === 'turns' && dialogueTurns && dialogueTurns.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {dialogueTurns.map((turn, idx) => {
-              const isCaller = turn.speaker === 'CALLER';
-              return (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: isCaller ? 'flex-start' : 'flex-end'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: isCaller ? '#38bdf8' : '#34d399', marginBottom: '2px' }}>
-                    {isCaller ? <PhoneCall size={12} /> : <User size={12} />}
-                    <span style={{ fontWeight: 700 }}>{isCaller ? 'INBOUND CALLER' : 'YOU (USER)'}</span>
-                    <span style={{ color: 'var(--text-muted)' }}>+{turn.timestamp_offset}s</span>
-                  </div>
-                  <div style={{
-                    maxWidth: '85%',
-                    padding: '8px 12px',
-                    borderRadius: '10px',
-                    background: isCaller ? 'rgba(30, 41, 59, 0.85)' : 'rgba(16, 185, 129, 0.15)',
-                    border: isCaller ? '1px solid rgba(56, 189, 248, 0.2)' : '1px solid rgba(16, 185, 129, 0.3)',
-                    color: '#f8fafc'
-                  }}>
-                    {highlightPhraseInText(turn.text)}
-                  </div>
-                </div>
-              );
-            })}
+        {turns.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)', fontSize: '13px' }}>
+            <p style={{ fontWeight: 500 }}>Standing by for speech input...</p>
+            <p style={{ fontSize: '12px', marginTop: '4px' }}>
+              Spoken conversation turns and detected intent patterns will appear here in real time.
+            </p>
           </div>
         ) : (
-          <div>{highlightPhraseInText(transcript)}</div>
+          turns.map((turn, idx) => {
+            const isCaller = turn.speaker === 'CALLER' || !turn.speaker;
+            const alert = isCaller ? getTurnSecurityAlert(turn.text) : null;
+            const borderColor = alert ? alert.border : isCaller ? 'var(--primary)' : 'var(--success)';
+
+            return (
+              <div
+                key={idx}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  backgroundColor: 'var(--surface)',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  borderLeft: `4px solid ${borderColor}`,
+                  padding: '12px 14px',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
+                {/* Speaker Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {isCaller ? (
+                      <PhoneCall size={13} style={{ color: 'var(--primary)' }} />
+                    ) : (
+                      <User size={13} style={{ color: 'var(--success)' }} />
+                    )}
+                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: isCaller ? 'var(--primary)' : 'var(--success)' }}>
+                      {isCaller ? 'INBOUND CALLER' : 'YOU (USER)'}
+                    </span>
+                  </div>
+                  {turn.timestamp_offset != null && (
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      +{turn.timestamp_offset}s
+                    </span>
+                  )}
+                </div>
+
+                {/* Spoken Utterance */}
+                <div style={{ fontSize: easyMode ? '16px' : '13.5px', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                  "{turn.text}"
+                </div>
+
+                {/* Inline Silent Witness AI Flag if suspicious */}
+                {alert && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginTop: '4px',
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      backgroundColor: alert.severity === 'danger' ? 'var(--danger-bg)' : alert.severity === 'critical' ? 'var(--critical-bg)' : 'var(--warning-bg)',
+                      border: `1px solid ${alert.severity === 'danger' ? 'var(--danger-border)' : 'var(--warning-border)'}`,
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      color: alert.severity === 'danger' ? 'var(--danger-text)' : 'var(--warning-text)',
+                    }}
+                  >
+                    <AlertTriangle size={12} />
+                    <span>SILENT WITNESS: {alert.label}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
 
-      {/* Legend */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginTop: '10px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+      {/* Footer Legend */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px', fontSize: '11px', color: 'var(--text-secondary)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '10px', height: '10px', background: '#ef4444', borderRadius: '2px' }} />
-          <span>Threat / Urgency</span>
+          <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: 'var(--primary)' }} />
+          <span>Normal Speech</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '10px', height: '10px', background: '#f59e0b', borderRadius: '2px' }} />
-          <span>Credential / OTP Request</span>
+          <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: 'var(--warning)' }} />
+          <span>Suspicious Impersonation</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          <span style={{ width: '10px', height: '10px', background: '#818cf8', borderRadius: '2px' }} />
-          <span>Unverified Identity Claim</span>
+          <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: 'var(--danger)' }} />
+          <span>Credential Demands</span>
         </div>
       </div>
     </div>

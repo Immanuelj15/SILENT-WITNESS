@@ -1,52 +1,106 @@
 import React from 'react';
-import { PhoneOff, ShieldAlert, CheckCircle, ExternalLink, AlertOctagon } from 'lucide-react';
+import { PhoneOff, ShieldAlert, CheckCircle2, AlertTriangle, AlertOctagon, ArrowRight } from 'lucide-react';
 
-export default function ActionCard({ recommendation = '', actions = [], easyModeSummary = '', riskScore = 0, onEndCall = null, easyMode = false }) {
-  const isHighDanger = riskScore > 60;
-  const isSuspicious = riskScore > 30 && riskScore <= 60;
+export default function ActionCard({
+  recommendation = '',
+  actions = [],
+  easyModeSummary = '',
+  riskScore = 0,
+  onEndCall = null,
+  easyMode = false,
+}) {
+  const getSeverity = () => {
+    if (riskScore >= 75) {
+      return {
+        level: 'CRITICAL',
+        title: 'Stop and verify',
+        description: 'End the conversation immediately and contact the organization using an official channel.',
+        badgeClass: 'badge-danger',
+        borderColor: 'var(--critical)',
+        bg: 'var(--critical-bg)',
+        icon: <AlertOctagon size={22} style={{ color: 'var(--critical)' }} />,
+      };
+    }
+    if (riskScore >= 50) {
+      return {
+        level: 'HIGH',
+        title: 'High-risk conversation',
+        description: 'Do not share OTP, PIN, passwords, or financial information.',
+        badgeClass: 'badge-danger',
+        borderColor: 'var(--danger)',
+        bg: 'var(--danger-bg)',
+        icon: <AlertTriangle size={22} style={{ color: 'var(--danger)' }} />,
+      };
+    }
+    if (riskScore >= 25) {
+      return {
+        level: 'MEDIUM',
+        title: 'Be cautious',
+        description: 'Avoid sharing sensitive personal or financial information.',
+        badgeClass: 'badge-warning',
+        borderColor: 'var(--warning)',
+        bg: 'var(--warning-bg)',
+        icon: <AlertTriangle size={22} style={{ color: 'var(--warning)' }} />,
+      };
+    }
+    return {
+      level: 'LOW',
+      title: 'Conversation appears safe',
+      description: 'Continue normally. Silent Witness continues standing guard in the background.',
+      badgeClass: 'badge-success',
+      borderColor: 'var(--success)',
+      bg: 'var(--success-bg)',
+      icon: <CheckCircle2 size={22} style={{ color: 'var(--success)' }} />,
+    };
+  };
+
+  const severity = getSeverity();
 
   return (
     <div
-      className="glass-panel"
+      className="sw-card"
       style={{
-        padding: '22px',
-        border: isHighDanger ? '1px solid rgba(239, 68, 68, 0.4)' : isSuspicious ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-glass)',
-        boxShadow: isHighDanger ? '0 0 35px rgba(239, 68, 68, 0.25)' : 'none'
+        padding: '20px 24px',
+        borderLeft: `4px solid ${severity.borderColor}`,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-        {isHighDanger ? <AlertOctagon size={20} color="#ef4444" /> : <ShieldAlert size={20} color="#06b6d4" />}
-        <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Recommended Safety Actions
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {severity.icon}
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', letterSpacing: '0.04em' }}>
+              RECOMMENDED SAFETY ACTION
+            </div>
+            <h4 style={{ fontSize: easyMode ? '19px' : '17px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              {severity.title}
+            </h4>
+          </div>
+        </div>
+
+        <span className={`badge ${severity.badgeClass}`}>
+          {severity.level}
         </span>
       </div>
 
-      {/* Main Big Alert Banner */}
-      <div style={{
-        padding: '16px',
-        borderRadius: '12px',
-        background: isHighDanger ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(185, 28, 28, 0.2) 100%)' : 'rgba(15, 23, 42, 0.7)',
-        border: isHighDanger ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(255, 255, 255, 0.08)',
-        marginBottom: '16px',
-        textAlign: 'center'
-      }}>
-        <div style={{
-          fontSize: easyMode ? '1.5rem' : '1.25rem',
-          fontWeight: 800,
-          color: isHighDanger ? '#fca5a5' : isSuspicious ? '#fde047' : '#86efac',
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase'
-        }}>
-          {recommendation || 'CONVERSATION APPEARS SAFE'}
-        </div>
-
-        {/* Easy Mode Human-understandable Explanation */}
-        <div style={{ fontSize: easyMode ? '1.15rem' : '0.92rem', color: '#f8fafc', marginTop: '6px', fontWeight: 500 }}>
-          {easyModeSummary || 'No dangerous patterns detected. Continue call normally.'}
-        </div>
+      {/* Main Guidance Text */}
+      <div
+        style={{
+          padding: '12px 16px',
+          borderRadius: '8px',
+          backgroundColor: severity.bg,
+          border: `1px solid ${severity.borderColor}40`,
+          fontSize: easyMode ? '16px' : '13px',
+          color: 'var(--text-primary)',
+          fontWeight: 500,
+          lineHeight: 1.5,
+          marginBottom: '16px',
+        }}
+      >
+        {easyModeSummary || severity.description}
       </div>
 
-      {/* Action items list */}
+      {/* Action Bullets if available */}
       {actions && actions.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
           {actions.map((act, idx) => (
@@ -55,44 +109,30 @@ export default function ActionCard({ recommendation = '', actions = [], easyMode
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
-                padding: '10px 14px',
-                borderRadius: '8px',
-                background: 'rgba(255, 255, 255, 0.03)',
-                fontSize: easyMode ? '1.05rem' : '0.88rem',
-                fontWeight: 600,
-                color: isHighDanger ? '#fecaca' : '#cbd5e1'
+                gap: '8px',
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
               }}
             >
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: isHighDanger ? '#ef4444' : '#06b6d4' }} />
-              {act}
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: severity.borderColor }} />
+              <span>{act}</span>
             </div>
           ))}
         </div>
       )}
 
-      {/* Quick Action Emergency Buttons */}
-      <div style={{ display: 'grid', gridTemplateColumns: onEndCall ? '1fr 1fr' : '1fr', gap: '10px' }}>
+      {/* Emergency Action Buttons */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
         {onEndCall && (
           <button
             onClick={onEndCall}
-            className="btn-danger"
-            style={{ width: '100%', fontSize: easyMode ? '1.15rem' : '0.92rem' }}
+            className={riskScore >= 50 ? 'btn-danger' : 'btn-secondary'}
+            style={{ padding: '8px 16px', fontSize: '13px' }}
           >
-            <PhoneOff size={18} />
-            END CALL NOW
+            <PhoneOff size={15} />
+            <span>End Active Call</span>
           </button>
         )}
-        <a
-          href="https://cybercrime.gov.in"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-secondary"
-          style={{ width: '100%', justifyContent: 'center', textDecoration: 'none', fontSize: easyMode ? '1.05rem' : '0.88rem' }}
-        >
-          <ExternalLink size={16} />
-          Official Verification Portal
-        </a>
       </div>
     </div>
   );

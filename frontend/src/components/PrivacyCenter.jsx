@@ -1,34 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Lock, Trash2, Download, CheckCircle, RefreshCw, AlertTriangle } from 'lucide-react';
+import {
+  Shield,
+  Lock,
+  Trash2,
+  Download,
+  CheckCircle2,
+  AlertTriangle,
+  HardDrive,
+  Cpu,
+  Cloud,
+  FileText,
+  RotateCcw
+} from 'lucide-react';
+import apiClient from '../utils/apiClient';
 
-export default function PrivacyCenter({ isOpen, onClose }) {
+export default function PrivacyCenter({ isOpen, onClose, isFullPage = true }) {
   const [settings, setSettings] = useState({
     audioStorageEnabled: false,
     transcriptStorageEnabled: true,
     retentionPeriodDays: 7,
     localProcessingEnabled: true,
     cloudProcessingEnabled: false,
-    analyticsConsent: true
+    analyticsConsent: false,
   });
+
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState(null);
+  const [notification, setNotification] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      fetchSettings();
-    }
-  }, [isOpen]);
+    fetchSettings();
+  }, []);
 
   const fetchSettings = async () => {
     try {
-      const res = await fetch('http://localhost:8000/api/privacy/settings');
-      if (res.ok) {
-        const data = await res.json();
-        setSettings(data);
+      const data = await apiClient.get('/api/privacy/settings');
+      if (data && typeof data === 'object') {
+        setSettings((prev) => ({ ...prev, ...data }));
       }
-    } catch (e) {
-      console.error('Privacy settings fetch error:', e);
+    } catch {
+      // Fallback to strict defaults
     }
   };
 
@@ -36,205 +47,241 @@ export default function PrivacyCenter({ isOpen, onClose }) {
     const updated = { ...settings, [key]: val };
     setSettings(updated);
     try {
-      await fetch('http://localhost:8000/api/privacy/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-      setMsg({ type: 'success', text: 'Privacy preference saved' });
-      setTimeout(() => setMsg(null), 3000);
-    } catch (e) {
-      setMsg({ type: 'error', text: 'Failed to update setting' });
+      await apiClient.put('/api/privacy/settings', updated);
+      setNotification({ type: 'success', message: 'Privacy preferences updated successfully' });
+      setTimeout(() => setNotification(null), 3500);
+    } catch {
+      setNotification({ type: 'error', message: 'Unable to sync privacy preferences with server' });
+      setTimeout(() => setNotification(null), 3500);
     }
   };
 
   const handleDeleteAllData = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:8000/api/privacy/data', {
-        method: 'DELETE'
-      });
-      if (res.ok) {
-        setMsg({ type: 'success', text: 'All user data, transcripts, and cached files permanently erased.' });
-        setConfirmDelete(false);
-      }
-    } catch (e) {
-      setMsg({ type: 'error', text: 'Error executing data deletion' });
+      await apiClient.delete('/api/privacy/data');
+      setNotification({ type: 'success', message: 'All local conversation transcripts and cached evidence permanently erased.' });
+      setConfirmDelete(false);
+    } catch {
+      setNotification({ type: 'error', message: 'Failed to complete data eradication request.' });
     } finally {
       setLoading(false);
     }
   };
 
   const handleExportData = () => {
-    const payload = JSON.stringify({
-      exportDate: new Date().toISOString(),
-      privacySettings: settings,
-      note: 'Exported from Silent Witness Local Data Vault.'
-    }, null, 2);
-
-    const blob = new Blob([payload], { type: 'application/json' });
+    const exportPayload = {
+      exportTimestamp: new Date().toISOString(),
+      privacyPolicyVersion: '2.0.0-enterprise',
+      settings,
+      dataRetentionNote: 'Only derived threat signatures and cryptographic audit logs are preserved with user consent.',
+    };
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `silent_witness_privacy_export_${Date.now()}.json`;
+    a.download = `SilentWitness_Privacy_Export_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    setNotification({ type: 'success', message: 'Privacy profile exported successfully' });
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
-              <Shield className="w-6 h-6" />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-100">Privacy & Data Governance Center</h3>
-              <p className="text-xs text-slate-400">
-                Privacy-by-Design controls. You maintain full sovereignty over your voice and transcripts.
-              </p>
-            </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '1000px' }}>
+      {/* Page Title & Subtitle */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <div style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
+            <Lock size={18} />
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 text-lg px-2.5 py-1 rounded-lg hover:bg-slate-800 transition"
-          >
-            ✕
-          </button>
+          <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
+            Privacy & Data Controls
+          </h2>
         </div>
+        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+          Control how Silent Witness handles your conversation data. Built with strict privacy-preserving local AI principles.
+        </p>
+      </div>
 
-        {msg && (
-          <div className={`p-3 rounded-lg text-xs font-medium mb-4 flex items-center gap-2 ${
-            msg.type === 'success' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/30'
-          }`}>
-            <CheckCircle className="w-4 h-4 flex-shrink-0" />
-            <span>{msg.text}</span>
-          </div>
-        )}
-
-        {/* Setting Toggles Grid */}
-        <div className="space-y-4 mb-6">
-          {/* Audio Storage */}
-          <div className="flex items-center justify-between p-3.5 bg-slate-950/60 rounded-xl border border-slate-800">
-            <div>
-              <div className="text-sm font-semibold text-slate-200">Raw Audio Storage</div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Keep raw audio recordings after acoustic inference (Default: OFF for security).
-              </p>
-            </div>
-            <button
-              onClick={() => updateSetting('audioStorageEnabled', !settings.audioStorageEnabled)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all ${
-                settings.audioStorageEnabled
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40'
-              }`}
-            >
-              {settings.audioStorageEnabled ? 'ON (Warning)' : 'OFF (Zero Raw Audio)'}
-            </button>
-          </div>
-
-          {/* Transcript Storage */}
-          <div className="flex items-center justify-between p-3.5 bg-slate-950/60 rounded-xl border border-slate-800">
-            <div>
-              <div className="text-sm font-semibold text-slate-200">Transcript History Retention</div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Preserve conversation transcripts for review and threat auditing.
-              </p>
-            </div>
-            <button
-              onClick={() => updateSetting('transcriptStorageEnabled', !settings.transcriptStorageEnabled)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all ${
-                settings.transcriptStorageEnabled
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-800 text-slate-400'
-              }`}
-            >
-              {settings.transcriptStorageEnabled ? 'ACTIVE (7 Days)' : 'DISABLED'}
-            </button>
-          </div>
-
-          {/* Retention Period Slider */}
-          <div className="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-semibold text-slate-200">Retention Horizon</span>
-              <span className="text-xs font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800">
-                {settings.retentionPeriodDays} Days
-              </span>
-            </div>
-            <input
-              type="range"
-              min="1"
-              max="30"
-              value={settings.retentionPeriodDays}
-              onChange={(e) => updateSetting('retentionPeriodDays', parseInt(e.target.value))}
-              className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-            />
-            <div className="flex justify-between text-[10px] text-slate-500 mt-1">
-              <span>1 Day (Ephemeral)</span>
-              <span>7 Days (Recommended)</span>
-              <span>30 Days (Extended)</span>
-            </div>
-          </div>
-
-          {/* Processing Mode */}
-          <div className="flex items-center justify-between p-3.5 bg-slate-950/60 rounded-xl border border-slate-800">
-            <div>
-              <div className="text-sm font-semibold text-slate-200">Local Privacy Mode</div>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Process audio and LLM reasoning exclusively on local device (GGUF / Nemotron).
-              </p>
-            </div>
-            <span className="text-xs px-2.5 py-1 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">
-              LOCAL HOSTED
-            </span>
-          </div>
+      {/* Toast Notification */}
+      {notification && (
+        <div
+          style={{
+            padding: '12px 16px',
+            borderRadius: '8px',
+            backgroundColor: notification.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+            border: `1px solid ${notification.type === 'success' ? 'var(--success-border)' : 'var(--danger-border)'}`,
+            color: notification.type === 'success' ? 'var(--success-text)' : 'var(--danger-text)',
+            fontSize: '13px',
+            fontWeight: 500,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          {notification.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          <span>{notification.message}</span>
         </div>
+      )}
 
-        {/* Action Controls */}
-        <div className="border-t border-slate-800 pt-4 flex flex-col sm:flex-row gap-3 justify-between items-center">
-          <div className="flex gap-2 w-full sm:w-auto">
-            <button
-              onClick={handleExportData}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition flex items-center gap-1.5"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export My Data
-            </button>
-          </div>
-
-          <div className="w-full sm:w-auto">
-            {!confirmDelete ? (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="w-full sm:w-auto px-4 py-2 bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-800/60 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                DELETE ALL MY DATA
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-red-400 font-medium">Are you sure?</span>
-                <button
-                  disabled={loading}
-                  onClick={handleDeleteAllData}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded text-xs font-bold transition"
-                >
-                  {loading ? 'Deleting...' : 'Confirm Wipe'}
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition"
-                >
-                  Cancel
-                </button>
+      {/* Privacy Settings Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '16px' }}>
+        {/* Card 1: Raw Audio */}
+        <div className="sw-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'var(--surface-alt)', color: 'var(--text-secondary)' }}>
+                <HardDrive size={18} />
               </div>
-            )}
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Raw Audio Storage
+                </h4>
+                <span className={`badge ${settings.audioStorageEnabled ? 'badge-warning' : 'badge-neutral'}`}>
+                  {settings.audioStorageEnabled ? 'ENABLED' : 'OFF'}
+                </span>
+              </div>
+            </div>
+
+            <input
+              type="checkbox"
+              checked={settings.audioStorageEnabled}
+              onChange={(e) => updateSetting('audioStorageEnabled', e.target.checked)}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+            />
           </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            Audio streams are processed in transient RAM for neural deepfake feature extraction and discarded immediately. Audio is not permanently stored.
+          </p>
+        </div>
+
+        {/* Card 2: Transcript History & Retention */}
+        <div className="sw-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
+                <FileText size={18} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Transcript Retention
+                </h4>
+                <span className="badge badge-primary">
+                  {settings.retentionPeriodDays} Days
+                </span>
+              </div>
+            </div>
+
+            <select
+              value={settings.retentionPeriodDays}
+              onChange={(e) => updateSetting('retentionPeriodDays', parseInt(e.target.value, 10))}
+              style={{
+                padding: '4px 8px',
+                borderRadius: '6px',
+                border: '1px solid var(--border)',
+                backgroundColor: 'var(--surface)',
+                fontSize: '12px',
+                fontWeight: 600,
+                outline: 'none',
+              }}
+            >
+              <option value={1}>1 Day</option>
+              <option value={7}>7 Days (Recommended)</option>
+              <option value={30}>30 Days</option>
+              <option value={90}>90 Days</option>
+            </select>
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            Spoken transcripts are retained locally to generate court-admissible forensic proof packages in the event of fraud, then automatically expunged.
+          </p>
+        </div>
+
+        {/* Card 3: Local AI Inference */}
+        <div className="sw-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'var(--success-bg)', color: 'var(--success)' }}>
+                <Cpu size={18} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  On-Device Local AI
+                </h4>
+                <span className="badge badge-success">ACTIVE</span>
+              </div>
+            </div>
+
+            <input
+              type="checkbox"
+              checked={settings.localProcessingEnabled}
+              onChange={(e) => updateSetting('localProcessingEnabled', e.target.checked)}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+            />
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            Voice feature extraction, acoustic anomaly detection, and transcript keyword pattern matching run on-device when supported by hardware.
+          </p>
+        </div>
+
+        {/* Card 4: Cloud Telemetry */}
+        <div className="sw-card" style={{ padding: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'var(--surface-alt)', color: 'var(--text-secondary)' }}>
+                <Cloud size={18} />
+              </div>
+              <div>
+                <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  Cloud Processing
+                </h4>
+                <span className="badge badge-neutral">OFF</span>
+              </div>
+            </div>
+
+            <input
+              type="checkbox"
+              checked={settings.cloudProcessingEnabled}
+              onChange={(e) => updateSetting('cloudProcessingEnabled', e.target.checked)}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+            />
+          </div>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+            No conversation audio or transcripts are sent to third-party cloud servers without your explicit real-time approval.
+          </p>
+        </div>
+      </div>
+
+      {/* Data Management Section */}
+      <div className="sw-card" style={{ padding: '24px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+          Data Rights & Portability
+        </h3>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '18px' }}>
+          Exercise your data rights under GDPR and Digital Personal Data Protection (DPDP) compliance frameworks.
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <button onClick={handleExportData} className="btn-secondary">
+            <Download size={15} />
+            <span>Export Evidence & Data Profile</span>
+          </button>
+
+          {!confirmDelete ? (
+            <button onClick={() => setConfirmDelete(true)} className="btn-danger">
+              <Trash2 size={15} />
+              <span>Delete All Data</span>
+            </button>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <button onClick={handleDeleteAllData} className="btn-danger" disabled={loading}>
+                <Trash2 size={15} />
+                <span>Confirm Permanent Deletion</span>
+              </button>
+              <button onClick={() => setConfirmDelete(false)} className="btn-ghost">
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

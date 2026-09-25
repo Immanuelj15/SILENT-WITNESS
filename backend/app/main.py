@@ -6,6 +6,7 @@ from backend.app.core.config import settings
 from backend.app.models.database import init_db
 from backend.app.api.routes import router as api_router
 from backend.app.api.websocket import ws_router
+from backend.app.api.ott_websocket import ott_ws_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -17,8 +18,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Real-Time AI Safety Layer for Voice Conversations: Voice Deepfake & Social Engineering Fraud Detector",
-    version="1.0.0",
+    description="Real-Time AI Safety Layer: Voice Deepfake, Social Engineering & OTT/VoIP Scam Detection",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -34,6 +35,7 @@ app.add_middleware(
 # Attach Routers
 app.include_router(api_router)
 app.include_router(ws_router)
+app.include_router(ott_ws_router)
 
 @app.get("/")
 def root():

@@ -9,7 +9,10 @@ from backend.app.models.schemas import (
     AnalysisResult,
     AnalyzeTextRequest,
     AudioUploadResponse,
-    CallSessionSummary
+    CallSessionSummary,
+    OTTAnalyzeRequest,
+    OTTAnalysisResult,
+    OTTFastPathAlert,
 )
 from backend.app.models.database import (
     get_db,
@@ -724,4 +727,128 @@ def get_all_platform_capabilities():
     }
 
 
+# ── OTT Edition REST Endpoints ───────────────────────────────────────────────
 
+@router.post("/ott/analyze", response_model=OTTAnalysisResult)
+def ott_analyze(request: OTTAnalyzeRequest):
+    """
+    REST endpoint for OTT/WhatsApp/Telegram call analysis.
+    Accepts transcript text + app-layer caller context + screen-share state + chat links.
+    Runs OTT identity, screen-share coercion, link phishing, and NLP analysis.
+    Fast-path overrides fire immediately for screen-share + financial context.
+    """
+    import time, datetime, uuid as _uuid
+    from backend.app.services.ott_identity_engine import ott_identity_engine
+    from backend.app.services.ott_trust_engine import ott_trust_engine
+
+    start = time.time()
+    session_id = str(_uuid.uuid4())
+
+    # 1. App-layer identity analysis
+    ctx = request.caller_context
+    if ctx:
+        identity_result = ott_identity_engine.analyze_caller(
+            phone_number=ctx.phone_number,
+            is_saved_contact=ctx.is_saved_contact,
+            contact_name=ctx.contact_name,
+            account_age_days=ctx.account_age_days,
+            call_origin=ctx.call_origin,
+            caller_display_name=ctx.caller_display_name,
+            caller_profile_text=ctx.caller_profile_text,
+            user_typical_country_codes=ctx.user_typical_country_codes,
+            is_video_call=ctx.is_video_call,
+            chat_messages_before_call=ctx.chat_messages_before_call,
+            has_unsolicited_link_before_call=ctx.has_unsolicited_link_before_call,
+        )
+        ott_identity_risk = identity_result["identity_risk_score"]
+        call_origin = ctx.call_origin
+    else:
+        identity_result = {"identity_risk_score": 15.0, "risk_tier": "LOW", "risk_factors": [], "risk_deductions": []}
+        ott_identity_risk = 15.0
+        call_origin = "DIRECT_DIAL"
+
+    # 2. Screen-share coercion analysis via existing engine
+    ss_result = screen_share_engine.analyze_text(request.text)
+    screen_coercion = ss_result.get("is_screen_share_demanded", False)
+
+    # 3. Chat link scanning
+    link_results = []
+    for lnk in request.links_in_chat:
+        link_results.append(url_analyzer.analyze_url(lnk))
+    max_link_risk = max((r["risk_score"] for r in link_results), default=0.0)
+
+    # 4. NLP base analysis via supervisor
+    nlp_result = supervisor.process_conversation(
+        transcript=request.text,
+        voice_result=None,
+        is_provisional=False,
+        channel=request.channel
+    )
+    base_nlp_risk = float(nlp_result.riskScore)
+
+    # 5. OTT Trust fusion
+    ott_fusion = ott_trust_engine.compute_ott_trust_score(
+        transcript=request.text,
+        base_nlp_risk=base_nlp_risk,
+        voice_risk=0.0,
+        screen_share_risk=float(ss_result.get("screen_share_risk", 0)),
+        video_extortion_risk=90.0 if request.video_extortion_pattern else 0.0,
+        ott_identity_risk=ott_identity_risk,
+        link_file_risk=max_link_risk,
+        screen_share_active=request.screen_share_active,
+        screen_share_coercion_detected=request.screen_share_coercion_detected or screen_coercion,
+        video_extortion_pattern=request.video_extortion_pattern,
+        call_origin=call_origin,
+    )
+
+    # 6. Build fast-path alert if triggered
+    fp_alert = None
+    if ott_fusion["fast_path_triggered"] and ott_fusion.get("fast_path_override"):
+        override = ott_fusion["fast_path_override"]
+        fp_alert = OTTFastPathAlert(
+            triggered=True,
+            rule_name=override.get("rule_name"),
+            label=override.get("label"),
+            recommended_action=override.get("recommended_action"),
+            risk_floor=override.get("risk_floor"),
+            emergency_actions=[
+                {"id": "stop_sharing", "label": "STOP SHARING", "severity": "primary"},
+                {"id": "end_call", "label": "END CALL", "severity": "danger"},
+                {"id": "block_caller", "label": "BLOCK CALLER", "severity": "danger"},
+            ]
+        )
+
+    return OTTAnalysisResult(
+        session_id=session_id,
+        ott_risk_score=ott_fusion["ott_risk_score"],
+        ott_trust_score=ott_fusion["ott_trust_score"],
+        classification=ott_fusion["classification"],
+        severity_label=ott_fusion["severity_label"],
+        fast_path_triggered=ott_fusion["fast_path_triggered"],
+        fast_path_alert=fp_alert,
+        identity_analysis=identity_result,
+        screen_share_analysis=ss_result,
+        link_analysis={"results": link_results, "max_risk": max_link_risk},
+        ott_signals=ott_fusion.get("ott_signals_detected", []),
+        attribution=ott_fusion.get("attribution"),
+        nlp_analysis=nlp_result,
+        channel=request.channel,
+        created_at=datetime.datetime.utcnow().isoformat(),
+    )
+
+
+@router.get("/ott/health")
+def ott_health():
+    """Healthcheck for OTT Protection module."""
+    return {
+        "status": "online",
+        "module": "Silent Witness OTT Edition",
+        "supported_channels": ["WHATSAPP", "TELEGRAM", "SIGNAL", "VOIP_UNKNOWN"],
+        "capabilities": {
+            "screen_share_detection": True,
+            "fast_path_override": True,
+            "video_extortion_defense": True,
+            "app_layer_identity": True,
+            "chat_link_scanner": True,
+        }
+    }

@@ -1,56 +1,54 @@
 import React, { useState, useEffect, useRef } from 'react';
+import './App.css';
+import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import TrustScoreRing from './components/TrustScoreRing';
-import LiveWaveform from './components/LiveWaveform';
-import LiveTranscript from './components/LiveTranscript';
-import EvidenceGroundingCard from './components/EvidenceGroundingCard';
+import DashboardOverview from './components/DashboardOverview';
+import TrustScoreBar from './components/TrustScoreBar';
 import ActionCard from './components/ActionCard';
-import DemoWalkthrough from './components/DemoWalkthrough';
-import AudioAnalyzer from './components/AudioAnalyzer';
-import HistoryDashboard from './components/HistoryDashboard';
-import MobileCallModal from './components/MobileCallModal';
-import FeatureAttributionDrawer from './components/FeatureAttributionDrawer';
-import UserFeedbackModal from './components/UserFeedbackModal';
+import LiveTranscript from './components/LiveTranscript';
 import AttackTimeline from './components/AttackTimeline';
 import IntentChain from './components/IntentChain';
 import IdentityVerificationPanel from './components/IdentityVerificationPanel';
-import PrivacyCenter from './components/PrivacyCenter';
+import HistoryDashboard from './components/HistoryDashboard';
+import DemoWalkthrough from './components/DemoWalkthrough';
 import ScamKnowledgeBase from './components/ScamKnowledgeBase';
 import EvaluationDashboard from './components/EvaluationDashboard';
+import CapabilitiesPage from './components/CapabilitiesPage';
+import AuditLedgerPage from './components/AuditLedgerPage';
+import PrivacyCenter from './components/PrivacyCenter';
+import OTTDashboard from './components/OTTDashboard';
+import EasyModeView from './components/EasyModeView';
+import AudioAnalyzer from './components/AudioAnalyzer';
+import MobileCallModal from './components/MobileCallModal';
 import PostCallSafetyReportModal from './components/PostCallSafetyReportModal';
+import UserFeedbackModal from './components/UserFeedbackModal';
+import ScreenShareAlertModal from './components/ScreenShareAlertModal';
+import VideoAnalysisVisualizer from './components/VideoAnalysisVisualizer';
 import CoachingPromptCard from './components/CoachingPromptCard';
 import EmotionalManipulationMeter from './components/EmotionalManipulationMeter';
-import ScriptFingerprintBadge from './components/ScriptFingerprintBadge';
 import CallerReputationBadge from './components/CallerReputationBadge';
-import TamperEvidentAuditModal from './components/TamperEvidentAuditModal';
 import ChannelSelector from './components/ChannelSelector';
-import ScreenShareAlertModal from './components/ScreenShareAlertModal';
-import PlatformCapabilityMatrixModal from './components/PlatformCapabilityMatrixModal';
-import VideoAnalysisVisualizer from './components/VideoAnalysisVisualizer';
+
 import {
-  Mic, MicOff, Send, Radio, Sparkles, AlertCircle, RefreshCw, MessageSquarePlus,
-  FileText, ShieldAlert, CheckCircle, Clock, GitCommit, UserCheck, Activity, Search,
-  PhoneOff, ShieldCheck
+  Mic, MicOff, Send, Radio, Sparkles, AlertCircle, RefreshCw,
+  FileText, ShieldAlert, CheckCircle, Clock, Smartphone,
+  PhoneOff, ShieldCheck, Settings as SettingsIcon, MessageSquarePlus
 } from 'lucide-react';
+import apiClient from './utils/apiClient';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('live');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedChannel, setSelectedChannel] = useState('SIM_CALL');
   const [easyMode, setEasyMode] = useState(false);
-  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
-  const [isCapabilitiesModalOpen, setIsCapabilitiesModalOpen] = useState(false);
-  const [isScreenShareAlertOpen, setIsScreenShareAlertOpen] = useState(false);
   const [language, setLanguage] = useState('en');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Modals & Drawers
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
-  const [isPrivacyCenterOpen, setIsPrivacyCenterOpen] = useState(false);
-  const [isKnowledgeBaseOpen, setIsKnowledgeBaseOpen] = useState(false);
-  const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [activeReportData, setActiveReportData] = useState(null);
-
-  // Tab for deep intelligence console
-  const [forensicTab, setForensicTab] = useState('timeline');
+  const [isScreenShareAlertOpen, setIsScreenShareAlertOpen] = useState(false);
 
   // Live Call Streaming State
   const [isRecording, setIsRecording] = useState(false);
@@ -61,8 +59,8 @@ export default function App() {
 
   // Current Analysis Data
   const [currentAnalysis, setCurrentAnalysis] = useState({
-    trustScore: 100,
-    riskScore: 0,
+    trustScore: 82,
+    riskScore: 18,
     confidence: 0.88,
     classification: 'SAFE',
     category: 'Legitimate Conversation',
@@ -76,11 +74,12 @@ export default function App() {
     voiceAnalysis: {
       voiceRisk: 12.0,
       confidence: 0.85,
-      indicators: ['Natural pitch variation and human acoustic balance'],
+      indicators: ['Natural human pitch variation and acoustic balance'],
       is_synthetic_suspected: false
     },
     callerReputation: {
       phone_number: "+91 98765 43210",
+      contact_name: "Unknown Caller",
       risk_tier: "UNKNOWN_NUMBER",
       label: "Unknown Inbound Caller",
       reputation_score: 60,
@@ -109,7 +108,7 @@ export default function App() {
     return () => clearInterval(timerRef.current);
   }, [isRecording]);
 
-  // Emergency trigger for screen share coercion modal
+  // Screen share emergency alert
   useEffect(() => {
     if (currentAnalysis?.screenShareAnalysis?.is_screen_share_demanded) {
       setIsScreenShareAlertOpen(true);
@@ -119,7 +118,7 @@ export default function App() {
   // Connect WebSocket for live call monitoring
   const connectWebSocket = () => {
     try {
-      const wsUrl = 'ws://localhost:8000/ws/live-call';
+      const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + (window.location.host || 'localhost:8000') + '/ws/live-call';
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -128,26 +127,26 @@ export default function App() {
 
       ws.onmessage = (event) => {
         try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'LIVE_UPDATE' && msg.analysis) {
-            setCurrentAnalysis(msg.analysis);
-            if (msg.analysis.transcript) {
-              setLiveTranscript(msg.analysis.transcript);
-            }
-            setIsProvisional(msg.isProvisional ?? true);
-          } else if (msg.event === 'risk_update' && msg.data) {
+          const data = JSON.parse(event.data);
+          if (data.type === 'LIVE_UPDATE' || data.type === 'STREAM_UPDATE') {
             setCurrentAnalysis(prev => ({
               ...prev,
-              riskScore: msg.data.riskScore,
-              trustScore: msg.data.trustScore,
-              classification: msg.data.status,
-              confidence: msg.data.confidence,
-              evidenceConfidence: msg.data.evidenceConfidence
+              ...data.payload,
+              trustScore: data.payload.trustScore ?? prev.trustScore,
+              riskScore: data.payload.riskScore ?? prev.riskScore,
             }));
+            if (data.payload.transcript) {
+              setLiveTranscript(data.payload.transcript);
+            }
+            setIsProvisional(Boolean(data.payload.isProvisional));
           }
-        } catch (e) {
-          console.error("Error decoding live update:", e);
+        } catch (err) {
+          console.error("Error parsing WebSocket message:", err);
         }
+      };
+
+      ws.onerror = (err) => {
+        console.warn("WebSocket connection notice:", err);
       };
 
       ws.onclose = () => {
@@ -155,49 +154,42 @@ export default function App() {
       };
 
       wsRef.current = ws;
-    } catch (err) {
-      console.error("Failed to connect live WebSocket:", err);
+    } catch (e) {
+      console.warn("Could not establish live WebSocket:", e);
     }
   };
 
-  // Start live microphone capture
+  // Start live monitoring
   const handleStartLiveCall = async () => {
     try {
-      setLiveTranscript('');
-      setCallDuration(0);
       setIsRecording(true);
+      setCallDuration(0);
+      setLiveTranscript('');
       connectWebSocket();
 
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaStreamRef.current = stream;
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-          const recognition = new SpeechRecognition();
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognition.lang = language === 'ta' ? 'ta-IN' : language === 'hi' ? 'hi-IN' : 'en-US';
-
-          recognition.onresult = (event) => {
-            let finalSnippet = '';
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-              if (event.results[i].isFinal) {
-                finalSnippet += event.results[i][0].transcript;
-              }
-            }
-            if (finalSnippet && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-              wsRef.current.send(JSON.stringify({ text: finalSnippet, isFinal: true }));
-            }
-          };
-
-          recognition.start();
-        }
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        mediaRecorder.ondataavailable = async (e) => {
+          if (e.data.size > 0 && wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64Audio = reader.result.split(',')[1];
+              wsRef.current.send(JSON.stringify({
+                type: 'AUDIO_CHUNK',
+                audioBase64: base64Audio,
+                channel: selectedChannel,
+              }));
+            };
+            reader.readAsDataURL(e.data);
+          }
+        };
+        mediaRecorder.start(1500); // 1.5s streaming intervals
       }
     } catch (err) {
-      console.warn("Microphone capture unavailable or denied:", err);
-      setIsRecording(true);
-      connectWebSocket();
+      console.warn("Microphone access notice (manual input mode active):", err);
     }
   };
 
@@ -205,30 +197,26 @@ export default function App() {
   const handleStopLiveCall = () => {
     setIsRecording(false);
     if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(t => t.stop());
+      mediaStreamRef.current.getTracks().forEach(track => track.stop());
       mediaStreamRef.current = null;
     }
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ isFinal: true, text: "" }));
+    if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
   };
 
-  // Send manual speech phrase to backend
-  const handleSendManualSpeech = async (overrideText = null, overrideChannel = null) => {
+  // Manual speech injection
+  const handleSendManualSpeech = async (overrideText = null) => {
     const textToSend = overrideText || manualInputText;
     if (!textToSend.trim()) return;
 
-    const channelToSend = overrideChannel || selectedChannel;
-
     try {
-      const res = await fetch('http://localhost:8000/api/analyze-text', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToSend, channel: channelToSend })
+      const data = await apiClient.post('/api/analyze-text', {
+        text: textToSend,
+        channel: selectedChannel,
       });
-      const data = await res.json();
+
       setCurrentAnalysis(data);
       setLiveTranscript(textToSend);
       setIsProvisional(false);
@@ -236,28 +224,23 @@ export default function App() {
         setManualInputText('');
       }
     } catch (e) {
-      console.error("Failed to analyze manual input text:", e);
+      console.warn("Analysis notice:", e);
     }
   };
 
-  // Open Post-Call Safety Report Modal
+  // Open Safety Report
   const handleOpenReport = async () => {
     if (currentAnalysis.id) {
       try {
-        const res = await fetch(`http://localhost:8000/api/analysis/${currentAnalysis.id}/report`);
-        if (res.ok) {
-          const report = await res.json();
-          setActiveReportData(report);
-          setIsReportModalOpen(true);
-          return;
-        }
-      } catch (e) {
-        console.error("Could not fetch pre-generated report:", e);
-      }
+        const report = await apiClient.get(`/api/analysis/${currentAnalysis.id}/report`);
+        setActiveReportData(report);
+        setIsReportModalOpen(true);
+        return;
+      } catch {}
     }
 
     setActiveReportData({
-      report_id: `REPORT-${Date.now().toString().slice(-6)}`,
+      report_id: `SW-AUDIT-${Date.now().toString().slice(-6)}`,
       generated_at: new Date().toISOString(),
       call_overview: {
         classification: currentAnalysis.classification,
@@ -270,7 +253,6 @@ export default function App() {
         scam_tactics_detected: currentAnalysis.riskFactors || [],
         credential_demands: currentAnalysis.suspiciousPhrases || [],
         verbatim_evidence_citations: currentAnalysis.evidence?.map(e => e.exact_phrase) || [],
-        contradictions_identified: currentAnalysis.identityAudit?.contradictions || []
       },
       risk_assessment: {
         threat_level: currentAnalysis.classification,
@@ -278,7 +260,7 @@ export default function App() {
         recommended_immediate_actions: currentAnalysis.actions || []
       },
       sanitized_summary_mode: {
-        summaryText: `Call evaluated as ${currentAnalysis.classification} (Trust: ${currentAnalysis.trustScore}/100, Risk: ${currentAnalysis.riskScore}/100). Category: ${currentAnalysis.category}. Primary recommendation: ${currentAnalysis.actions?.[0] || 'Stay cautious'}.`
+        summaryText: `Call evaluated as ${currentAnalysis.classification} (Trust: ${currentAnalysis.trustScore}/100). Category: ${currentAnalysis.category}.`
       }
     });
     setIsReportModalOpen(true);
@@ -288,510 +270,367 @@ export default function App() {
   const quickTestScenarios = [
     {
       title: "Bank KYC OTP Demand",
-      icon: "🏦",
       phrase: "Hello sir, calling from your bank SBI. Your account will be blocked within 1 hour. Share the 6-digit OTP immediately to avoid permanent deactivation."
     },
     {
-      title: "Digital Arrest / Police",
-      icon: "🚨",
-      phrase: "This is Mumbai Police Customs Department. A parcel in your name was seized containing illegal narcotics. You are under immediate digital arrest and Skype surveillance."
+      title: "Digital Arrest Threat",
+      phrase: "This is Mumbai Police Cyber Crime Cell. A parcel in your name was seized containing illegal narcotics. You are under immediate digital arrest."
     },
     {
-      title: "Electricity Power Cut",
-      icon: "⚡",
-      phrase: "Dear consumer, your electricity will be disconnected tonight at 9:30 PM due to unpaid previous bill. Call our officer immediately to pay Rs 10 update fee."
+      title: "Screen Share Demand",
+      phrase: "Please open WhatsApp video call, tap the Share Screen button, and log in to your mobile banking app so I can verify the reversal."
     },
     {
-      title: "Hospital Emergency (Safe)",
-      icon: "🏥",
-      phrase: "Hello Mr. Kumar, this is Apollo Hospital reception confirming your routine health checkup tomorrow at 10 AM. Please bring your medical file."
+      title: "Legitimate Courier Delivery",
+      phrase: "Hello, this is Blue Dart courier. I have an express book delivery for your address. Are you available to receive it?"
     }
   ];
 
-  const isHighRisk = currentAnalysis.riskScore >= 65;
-  const isMediumRisk = currentAnalysis.riskScore >= 35 && currentAnalysis.riskScore < 65;
-
   return (
-    <div className={easyMode ? 'easy-mode' : ''} style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Header
+    <div className={`app-layout ${easyMode ? 'easy-mode' : ''}`}>
+      {/* 1. Left SaaS Sidebar */}
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         easyMode={easyMode}
         setEasyMode={setEasyMode}
-        language={language}
-        setLanguage={setLanguage}
-        onOpenMobileView={() => setIsMobileModalOpen(true)}
-        onOpenPrivacyCenter={() => setIsPrivacyCenterOpen(true)}
-        onOpenKnowledgeBase={() => setIsKnowledgeBaseOpen(true)}
-        onOpenEvaluation={() => setIsEvaluationOpen(true)}
-        onOpenReport={handleOpenReport}
-        onOpenAudit={() => setIsAuditModalOpen(true)}
-        onOpenCapabilities={() => setIsCapabilitiesModalOpen(true)}
+        isMobileOpen={isMobileSidebarOpen}
+        setIsMobileOpen={setIsMobileSidebarOpen}
       />
 
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '20px 24px', flex: 1, width: '100%' }}>
-        {/* TAB 1: LIVE CALL MONITOR */}
-        {activeTab === 'live' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Universal Communication Channel Selector & Platform Honesty Status */}
-            <ChannelSelector
-              selectedChannel={selectedChannel}
-              onSelectChannel={(ch) => {
-                setSelectedChannel(ch);
-                setCurrentAnalysis(prev => ({ ...prev, channel: ch }));
-              }}
-              capabilities={currentAnalysis.capabilities}
+      {/* 2. Main Application Container */}
+      <div className="app-main">
+        {/* Top Header */}
+        <Header
+          activeTab={activeTab}
+          easyMode={easyMode}
+          setEasyMode={setEasyMode}
+          language={language}
+          setLanguage={setLanguage}
+          isRecording={isRecording}
+          onMenuToggle={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        />
+
+        {/* Content Area */}
+        <main className="app-content">
+          {/* Easy Mode View Override */}
+          {easyMode && activeTab === 'live' ? (
+            <EasyModeView
+              trustScore={currentAnalysis.trustScore}
+              riskScore={currentAnalysis.riskScore}
+              onEndCall={isRecording ? handleStopLiveCall : null}
             />
+          ) : (
+            <>
+              {/* TAB: DASHBOARD OVERVIEW */}
+              {activeTab === 'dashboard' && (
+                <DashboardOverview
+                  currentAnalysis={currentAnalysis}
+                  isRecording={isRecording}
+                  callDuration={callDuration}
+                  onNavigateToLive={() => setActiveTab('live')}
+                  onNavigateToOTT={() => setActiveTab('ott')}
+                  onNavigateToDemos={() => setActiveTab('demos')}
+                  onRunScenario={(phrase) => {
+                    setActiveTab('live');
+                    handleSendManualSpeech(phrase);
+                  }}
+                  selectedChannel={selectedChannel}
+                />
+              )}
 
-            {/* Top Operational Status Banner */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className={isRecording ? 'radar-dot' : 'w-3 h-3 rounded-full bg-emerald-500'} />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-white text-base">
-                      {isRecording ? 'Live Call Shield Active' : 'Real-Time Voice Shield Standby'}
-                    </span>
-                    <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full border ${isRecording ? 'bg-red-500/20 text-red-300 border-red-500/40 animate-pulse' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'}`}>
-                      {isRecording ? `MONITORING (${callDuration}s)` : 'ARMED & READY'}
-                    </span>
+              {/* TAB: LIVE CALL MONITOR */}
+              {activeTab === 'live' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  {/* Channel & Capabilities Selector */}
+                  <ChannelSelector
+                    selectedChannel={selectedChannel}
+                    onSelectChannel={(ch) => {
+                      setSelectedChannel(ch);
+                      setCurrentAnalysis(prev => ({ ...prev, channel: ch }));
+                    }}
+                    capabilities={currentAnalysis.capabilities}
+                  />
+
+                  {/* Operational Status & Action Bar */}
+                  <div className="sw-card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <span className={`status-dot ${isRecording ? 'status-dot-warning' : 'status-dot-active'}`} />
+                      <div>
+                        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {isRecording ? `Monitoring Spoken Conversation (${callDuration}s)` : 'Live Voice Shield Armed & Standby'}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                          Continuous neural deepfake detection, intent classification, and credential harvesting defense
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      {!isRecording ? (
+                        <button onClick={handleStartLiveCall} className="btn-primary" style={{ padding: '8px 16px' }}>
+                          <Mic size={15} />
+                          <span>Start Monitoring</span>
+                        </button>
+                      ) : (
+                        <button onClick={handleStopLiveCall} className="btn-danger" style={{ padding: '8px 16px' }}>
+                          <MicOff size={15} />
+                          <span>Stop Monitoring</span>
+                        </button>
+                      )}
+
+                      <button onClick={handleOpenReport} className="btn-secondary" style={{ padding: '8px 14px' }}>
+                        <FileText size={15} />
+                        <span>Safety Report</span>
+                      </button>
+
+                      <button onClick={() => setIsMobileModalOpen(true)} className="btn-ghost" style={{ padding: '8px 12px' }} title="Preview Android Mobile Alert">
+                        <Smartphone size={16} />
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Continuous acoustic voice verification & live conversational fraud intelligence
-                  </p>
+
+                  {/* Manual Speech & Preset Simulator Input Bar */}
+                  <div className="sw-card" style={{ padding: '16px 20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                      <input
+                        type="text"
+                        placeholder="Simulate or inject live conversation turn (e.g. 'I am calling from SBI, share OTP')..."
+                        value={manualInputText}
+                        onChange={(e) => setManualInputText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSendManualSpeech(); }}
+                        className="sw-input"
+                        style={{ flex: 1 }}
+                      />
+                      <button onClick={() => handleSendManualSpeech()} className="btn-primary" style={{ padding: '8px 16px' }}>
+                        <Send size={14} />
+                        <span>Analyze</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Preset Buttons */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
+                        1-Click Test Scenarios:
+                      </span>
+                      {quickTestScenarios.map((scen, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => handleSendManualSpeech(scen.phrase)}
+                          className="btn-ghost"
+                          style={{
+                            fontSize: '11.5px',
+                            padding: '4px 10px',
+                            backgroundColor: 'var(--surface-alt)',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border)',
+                          }}
+                        >
+                          {scen.title}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Video Integrity Visualizer (if video call) */}
+                  {(selectedChannel === 'VIDEO_CALL' || currentAnalysis.videoAnalysisResult) && (
+                    <VideoAnalysisVisualizer
+                      videoResult={currentAnalysis.videoAnalysisResult || {
+                        visual_risk: selectedChannel === 'VIDEO_CALL' ? 15.0 : 0.0,
+                        confidence: 0.85,
+                        signals: [],
+                        is_extortion: false
+                      }}
+                    />
+                  )}
+
+                  {/* Main 2-Column Live Protection Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                    {/* Left Column: Trust Score Bar + Recommended Safety Action */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <TrustScoreBar
+                        trustScore={currentAnalysis.trustScore}
+                        riskScore={currentAnalysis.riskScore}
+                        classification={currentAnalysis.classification}
+                        category={currentAnalysis.category}
+                        voiceAnalysis={currentAnalysis.voiceAnalysis}
+                        callerReputation={currentAnalysis.callerReputation}
+                        evidence={currentAnalysis.evidence}
+                      />
+
+                      <ActionCard
+                        recommendation={currentAnalysis.recommendation}
+                        actions={currentAnalysis.actions}
+                        easyModeSummary={currentAnalysis.easyModeSummary}
+                        riskScore={currentAnalysis.riskScore}
+                        onEndCall={isRecording ? handleStopLiveCall : null}
+                      />
+                    </div>
+
+                    {/* Right Column: Caller Identity + Live Transcript */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <IdentityVerificationPanel
+                        identityAudit={currentAnalysis.identityAudit}
+                        callerReputation={currentAnalysis.callerReputation}
+                      />
+
+                      <LiveTranscript
+                        transcript={liveTranscript}
+                        dialogueTurns={currentAnalysis.dialogueTurns}
+                        evidence={currentAnalysis.evidence}
+                        suspiciousPhrases={currentAnalysis.suspiciousPhrases}
+                        isProvisional={isProvisional}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Attack Timeline & Intent Chain Row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                    <AttackTimeline timeline={currentAnalysis.attackTimeline} />
+                    <IntentChain intentChain={currentAnalysis.intentChain} />
+                  </div>
+
+                  {/* Bottom Assistance Modules (Coaching & Emotional Manipulation) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                    {currentAnalysis.coachingPrompt && (
+                      <CoachingPromptCard coachingPrompt={currentAnalysis.coachingPrompt} />
+                    )}
+                    {currentAnalysis.emotionalManipulation && (
+                      <EmotionalManipulationMeter emotionalData={currentAnalysis.emotionalManipulation} />
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2.5">
-                {!isRecording ? (
-                  <button
-                    onClick={handleStartLiveCall}
-                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-900/30 transition-all flex items-center gap-2 cursor-pointer border border-emerald-400/30"
-                  >
-                    <Mic className="w-4 h-4" /> START MONITORING
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleStopLiveCall}
-                    className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-red-900/30 transition-all flex items-center gap-2 cursor-pointer border border-red-400/30 animate-pulse"
-                  >
-                    <MicOff className="w-4 h-4" /> STOP MONITORING
-                  </button>
-                )}
+              {/* TAB: CALL HISTORY */}
+              {activeTab === 'history' && (
+                <HistoryDashboard onSelectSession={(id) => console.log(id)} />
+              )}
 
-                <button
-                  onClick={handleOpenReport}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
-                  title="Generate structured safety report"
-                >
-                  <FileText className="w-4 h-4 text-cyan-400" /> Safety Report
-                </button>
+              {/* TAB: SCAM DEMOS */}
+              {activeTab === 'demos' && (
+                <DemoWalkthrough onRunLiveScenario={(phrase) => {
+                  setActiveTab('live');
+                  handleSendManualSpeech(phrase);
+                }} />
+              )}
 
-                <button
-                  onClick={() => setIsFeedbackModalOpen(true)}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl border border-slate-700 transition flex items-center gap-1.5 cursor-pointer"
-                  title="Submit feedback or report false alarm"
-                >
-                  <MessageSquarePlus className="w-4 h-4 text-indigo-400" /> Calibrate
-                </button>
-              </div>
-            </div>
+              {/* TAB: KNOWLEDGE BASE */}
+              {activeTab === 'intelligence' && (
+                <ScamKnowledgeBase isFullPage={true} />
+              )}
 
-            {/* Critical Alert Banner if High Risk */}
-            {isHighRisk && (
-              <div className="bg-red-950/40 border border-red-500/50 rounded-2xl p-4 shadow-xl backdrop-blur-md flex items-center justify-between gap-4 animate-fade-in">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-red-500/20 border border-red-500/40 text-red-400">
-                    <ShieldAlert className="w-6 h-6 animate-pulse" />
-                  </div>
+              {/* TAB: AI EVALUATION */}
+              {activeTab === 'evaluation' && (
+                <EvaluationDashboard isFullPage={true} />
+              )}
+
+              {/* TAB: WHATSAPP / OTT */}
+              {activeTab === 'ott' && (
+                <OTTDashboard />
+              )}
+
+              {/* TAB: PRIVACY & DATA */}
+              {activeTab === 'privacy' && (
+                <PrivacyCenter isFullPage={true} />
+              )}
+
+              {/* TAB: AUDIT LEDGER */}
+              {activeTab === 'audit' && (
+                <AuditLedgerPage sessionId={currentAnalysis.id || 'default-session'} />
+              )}
+
+              {/* TAB: CAPABILITIES MATRIX */}
+              {activeTab === 'capabilities' && (
+                <CapabilitiesPage />
+              )}
+
+              {/* TAB: SETTINGS */}
+              {activeTab === 'settings' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '800px' }}>
                   <div>
-                    <h3 className="text-sm font-bold text-red-200 uppercase tracking-wide">
-                      HIGH RISK COERCION DETECTED — DO NOT SHARE SENSITIVE DATA
-                    </h3>
-                    <p className="text-xs text-red-300/90 mt-0.5">
-                      The caller is attempting credential harvesting or intimidation tactics. Hang up immediately.
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                      <div style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
+                        <SettingsIcon size={18} />
+                      </div>
+                      <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        System & Administrative Settings
+                      </h2>
+                    </div>
+                    <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      Manage telemetry parameters, real-time threat thresholds, and notification protocols.
                     </p>
                   </div>
-                </div>
-                <button
-                  onClick={handleStopLiveCall}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-red-900/40 shrink-0 cursor-pointer"
-                >
-                  <PhoneOff className="w-4 h-4" /> DISCONNECT CALL
-                </button>
-              </div>
-            )}
 
-            {/* Video Call & Visual Deepfake Shield (for Video Calls or when Visual Analysis Present) */}
-            {(selectedChannel === 'VIDEO_CALL' || currentAnalysis.videoAnalysisResult) && (
-              <VideoAnalysisVisualizer
-                videoResult={currentAnalysis.videoAnalysisResult || {
-                  visual_risk: selectedChannel === 'VIDEO_CALL' ? 15.0 : 0.0,
-                  confidence: 0.85,
-                  signals: [],
-                  is_extortion: false
-                }}
-              />
-            )}
+                  <div className="sw-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Screen-Share Fast-Path Intercept</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Instantly escalate to critical tier if screen sharing is active with credential asks</div>
+                      </div>
+                      <span className="badge badge-success">Always Enforced</span>
+                    </div>
 
-            {/* Caller Reputation & Script Fingerprint Chips */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {currentAnalysis.callerReputation && (
-                <CallerReputationBadge callerReputation={currentAnalysis.callerReputation} />
-              )}
-              {currentAnalysis.scriptFingerprint && currentAnalysis.scriptFingerprint.matched ? (
-                <ScriptFingerprintBadge scriptFingerprint={currentAnalysis.scriptFingerprint} />
-              ) : (
-                <div className="bg-slate-900/60 border border-slate-800/80 rounded-xl p-3 flex items-center gap-3 text-xs backdrop-blur-sm">
-                  <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                    <ShieldCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <span className="font-semibold text-slate-200">Script Fingerprint Scanner</span>
-                    <p className="text-[11px] text-slate-400">No canonical scam script signature matched yet.</p>
-                  </div>
-                </div>
-              )}
-            </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Emergency Audio Disconnection</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Permit 1-tap call termination button on lockscreen overlay</div>
+                      </div>
+                      <input type="checkbox" defaultChecked style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }} />
+                    </div>
 
-            {/* Core Split Grid: Left = Trust & Defensive Coaching, Right = Waveform & Live Dialogue */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-              {/* Left Column (5 Cols): Trust Score, Coaching Prompt, Action Card */}
-              <div className="lg:col-span-5 flex flex-col gap-5">
-                <TrustScoreRing
-                  trustScore={currentAnalysis.trustScore}
-                  riskScore={currentAnalysis.riskScore}
-                  confidence={currentAnalysis.confidence}
-                  isProvisional={isProvisional}
-                  easyMode={easyMode}
-                />
-
-                {/* Real-Time Verbal Coaching Card */}
-                {currentAnalysis.coaching && (
-                  <CoachingPromptCard coaching={currentAnalysis.coaching} />
-                )}
-
-                <ActionCard
-                  recommendation={currentAnalysis.recommendation}
-                  actions={currentAnalysis.actions}
-                  easyModeSummary={currentAnalysis.easyModeSummary}
-                  riskScore={currentAnalysis.riskScore}
-                  onEndCall={isRecording ? handleStopLiveCall : null}
-                  easyMode={easyMode}
-                />
-
-                <FeatureAttributionDrawer
-                  attributions={currentAnalysis.attributions}
-                  severityTier={currentAnalysis.severityTier}
-                  easyMode={easyMode}
-                />
-              </div>
-
-              {/* Right Column (7 Cols): Audio Waveform, Live Transcript, Speech Simulator */}
-              <div className="lg:col-span-7 flex flex-col gap-5">
-                <LiveWaveform
-                  isRecording={isRecording}
-                  voiceAnalysis={currentAnalysis.voiceAnalysis}
-                  duration={callDuration}
-                />
-
-                <LiveTranscript
-                  transcript={liveTranscript || currentAnalysis.transcript}
-                  dialogueTurns={currentAnalysis.dialogueTurns}
-                  evidence={currentAnalysis.evidence}
-                  suspiciousPhrases={currentAnalysis.suspiciousPhrases}
-                  isProvisional={isProvisional}
-                  easyMode={easyMode}
-                />
-
-                {/* Speech Input & 1-Click Quick Attack Scenario Simulator */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl backdrop-blur-md">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-                      Live Speech Simulator
-                    </span>
-                    <span className="text-[11px] text-slate-400">
-                      Type phrase or tap 1-click test lures below
-                    </span>
-                  </div>
-
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleSendManualSpeech();
-                    }}
-                    className="flex gap-2 mb-3"
-                  >
-                    <input
-                      type="text"
-                      value={manualInputText}
-                      onChange={(e) => setManualInputText(e.target.value)}
-                      placeholder='Type speech e.g., "Your account will be blocked. Share the OTP now."'
-                      className="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
-                    />
-                    <button
-                      type="submit"
-                      className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-900/20 shrink-0"
-                    >
-                      <Send className="w-3.5 h-3.5" /> Analyze
-                    </button>
-                  </form>
-
-                  {/* 1-Click Quick Scenario Pills */}
-                  <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-800/80">
-                    <span className="text-[11px] text-slate-400 self-center mr-1 font-semibold">1-Click Test:</span>
-                    {quickTestScenarios.map((sc, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleSendManualSpeech(sc.phrase)}
-                        className="px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 border border-slate-700/60 hover:border-cyan-500/40 text-[11px] text-slate-300 font-medium transition cursor-pointer flex items-center gap-1.5"
-                      >
-                        <span>{sc.icon}</span>
-                        <span>{sc.title}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Audio File Forensic Uploader</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Analyze pre-recorded WAV or MP3 evidence files</div>
+                      </div>
+                      <button onClick={() => setActiveTab('audio_upload')} className="btn-secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
+                        Open File Uploader
                       </button>
-                    ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Deep Conversational Intelligence Section Organized in Tabs */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-md mt-2">
-              <div className="flex items-center justify-between mb-4 flex-wrap gap-3 pb-3 border-b border-slate-800">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-cyan-400" />
-                    Deep Forensic Intelligence Console
-                  </h3>
-                  <p className="text-[11px] text-slate-400">
-                    Explore multi-turn attack timeline, identity verification, emotional coercion, and grounded citations
-                  </p>
+              {/* TAB: AUDIO FILE UPLOADER */}
+              {activeTab === 'audio_upload' && (
+                <div style={{ maxWidth: '800px' }}>
+                  <AudioAnalyzer onAnalysisComplete={(result) => {
+                    setCurrentAnalysis(prev => ({ ...prev, ...result }));
+                    setActiveTab('live');
+                  }} />
                 </div>
+              )}
+            </>
+          )}
+        </main>
+      </div>
 
-                {/* Segmented Tab Controls */}
-                <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                  <button
-                    onClick={() => setForensicTab('timeline')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                      forensicTab === 'timeline'
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    Timeline ({currentAnalysis.timeline?.length || 0})
-                  </button>
-
-                  <button
-                    onClick={() => setForensicTab('chain')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                      forensicTab === 'chain'
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <GitCommit className="w-3.5 h-3.5" />
-                    Attack Chain
-                  </button>
-
-                  <button
-                    onClick={() => setForensicTab('identity')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                      forensicTab === 'identity'
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <UserCheck className="w-3.5 h-3.5" />
-                    Caller Identity
-                  </button>
-
-                  <button
-                    onClick={() => setForensicTab('emotion')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                      forensicTab === 'emotion'
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Activity className="w-3.5 h-3.5" />
-                    Coercion Meter
-                  </button>
-
-                  <button
-                    onClick={() => setForensicTab('evidence')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 ${
-                      forensicTab === 'evidence'
-                        ? 'bg-indigo-600 text-white shadow-md'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    <Search className="w-3.5 h-3.5" />
-                    Evidence ({currentAnalysis.evidence?.length || 0})
-                  </button>
-                </div>
-              </div>
-
-              {/* Tab Content Display */}
-              <div className="pt-2">
-                {forensicTab === 'timeline' && (
-                  <AttackTimeline timeline={currentAnalysis.timeline} />
-                )}
-
-                {forensicTab === 'chain' && (
-                  <IntentChain intentChain={currentAnalysis.intentChain} />
-                )}
-
-                {forensicTab === 'identity' && (
-                  <IdentityVerificationPanel identityAudit={currentAnalysis.identityAudit} />
-                )}
-
-                {forensicTab === 'emotion' && (
-                  <EmotionalManipulationMeter emotionData={currentAnalysis.emotionAnalysis} />
-                )}
-
-                {forensicTab === 'evidence' && (
-                  <EvidenceGroundingCard
-                    evidence={currentAnalysis.evidence}
-                    category={currentAnalysis.category}
-                    aiExplanation={currentAnalysis.aiExplanation}
-                    easyMode={easyMode}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: UPLOAD RECORDED AUDIO */}
-        {activeTab === 'upload' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-            <AudioAnalyzer
-              onAnalysisComplete={(data) => {
-                setCurrentAnalysis(data);
-                setLiveTranscript(data.transcript);
-              }}
-            />
-
-            {/* Display Results */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <TrustScoreRing
-                trustScore={currentAnalysis.trustScore}
-                riskScore={currentAnalysis.riskScore}
-                confidence={currentAnalysis.confidence}
-                isProvisional={false}
-                easyMode={easyMode}
-              />
-              <ActionCard
-                recommendation={currentAnalysis.recommendation}
-                actions={currentAnalysis.actions}
-                easyModeSummary={currentAnalysis.easyModeSummary}
-                riskScore={currentAnalysis.riskScore}
-                easyMode={easyMode}
-              />
-            </div>
-
-            <EvidenceGroundingCard
-              evidence={currentAnalysis.evidence}
-              category={currentAnalysis.category}
-              aiExplanation={currentAnalysis.aiExplanation}
-              easyMode={easyMode}
-            />
-          </div>
-        )}
-
-        {/* TAB 3: GUIDED SCAM DEMONSTRATIONS */}
-        {activeTab === 'demo' && (
-          <DemoWalkthrough
-            onSimulateStep={(accumulatedTranscript, stepConfig) => {
-              setLiveTranscript(accumulatedTranscript);
-              const targetChannel = stepConfig?.channel || selectedChannel;
-              if (targetChannel !== selectedChannel) {
-                setSelectedChannel(targetChannel);
-              }
-              handleSendManualSpeech(accumulatedTranscript, targetChannel);
-            }}
-          />
-        )}
-
-        {/* TAB 4: CALL HISTORY */}
-        {activeTab === 'history' && (
-          <HistoryDashboard
-            onSelectSession={async (id) => {
-              try {
-                const res = await fetch(`http://localhost:8000/api/analysis/${id}`);
-                const data = await res.json();
-                setCurrentAnalysis(data);
-                setLiveTranscript(data.transcript);
-                setActiveTab('live');
-              } catch (e) {
-                console.error(e);
-              }
-            }}
-          />
-        )}
-      </main>
-
-      {/* Section 23 Mobile View Call Simulation Modal */}
+      {/* Global Modals */}
       <MobileCallModal
         isOpen={isMobileModalOpen}
         onClose={() => setIsMobileModalOpen(false)}
         analysis={currentAnalysis}
-        onEndCall={handleStopLiveCall}
+        onEndCall={isRecording ? handleStopLiveCall : null}
       />
 
-      {/* Screen Sharing Scam Intervention Alert Modal */}
-      <ScreenShareAlertModal
-        isOpen={isScreenShareAlertOpen}
-        onClose={() => setIsScreenShareAlertOpen(false)}
-        screenData={currentAnalysis.screenShareAnalysis}
-        onEndCall={handleStopLiveCall}
-      />
-
-      {/* Platform Capability & Technical Honesty Matrix Modal */}
-      <PlatformCapabilityMatrixModal
-        isOpen={isCapabilitiesModalOpen}
-        onClose={() => setIsCapabilitiesModalOpen(false)}
-      />
-
-      {/* User Feedback Loop Modal */}
-      <UserFeedbackModal
-        isOpen={isFeedbackModalOpen}
-        onClose={() => setIsFeedbackModalOpen(false)}
-        callId={currentAnalysis.id}
-      />
-
-      {/* Privacy Center Modal */}
-      <PrivacyCenter
-        isOpen={isPrivacyCenterOpen}
-        onClose={() => setIsPrivacyCenterOpen(false)}
-      />
-
-      {/* Scam Knowledge Base Modal */}
-      <ScamKnowledgeBase
-        isOpen={isKnowledgeBaseOpen}
-        onClose={() => setIsKnowledgeBaseOpen(false)}
-      />
-
-      {/* Evaluation Dashboard Modal */}
-      <EvaluationDashboard
-        isOpen={isEvaluationOpen}
-        onClose={() => setIsEvaluationOpen(false)}
-      />
-
-      {/* Post-Call Safety Report Modal */}
       <PostCallSafetyReportModal
         isOpen={isReportModalOpen}
         onClose={() => setIsReportModalOpen(false)}
         reportData={activeReportData}
       />
 
-      {/* Tamper-Evident Cryptographic Audit Ledger Modal */}
-      <TamperEvidentAuditModal
-        isOpen={isAuditModalOpen}
-        onClose={() => setIsAuditModalOpen(false)}
-        sessionId={currentAnalysis.id}
+      <UserFeedbackModal
+        isOpen={isFeedbackModalOpen}
+        onClose={() => setIsFeedbackModalOpen(false)}
+        analysisId={currentAnalysis.id}
+      />
+
+      <ScreenShareAlertModal
+        isOpen={isScreenShareAlertOpen}
+        onClose={() => setIsScreenShareAlertOpen(false)}
+        onStopSharing={() => setIsScreenShareAlertOpen(false)}
+        evidenceText={currentAnalysis?.screenShareAnalysis?.matched_patterns?.[0] || 'Caller requested screen access'}
       />
     </div>
   );

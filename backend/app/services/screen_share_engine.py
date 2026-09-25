@@ -79,6 +79,7 @@ class ScreenShareRiskEngine:
         return {
             "screen_share_risk": risk_score,
             "detected": is_detected,
+            "is_screen_share_demanded": is_detected,  # OTT compatibility alias
             "risk_level": "CRITICAL" if risk_score >= 85 else "HIGH" if risk_score >= 60 else "LOW",
             "matched_patterns": list(set(matched_patterns)),
             "target_assets_at_risk": assets_at_risk,

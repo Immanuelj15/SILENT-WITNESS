@@ -125,3 +125,57 @@ class UserFeedbackResponse(BaseModel):
     message: str
     calibrated_adjustment: str
 
+
+# ── OTT Edition Schemas ──────────────────────────────────────────────────────
+
+class OTTCallerContext(BaseModel):
+    """App-layer caller identity signals for OTT call sessions."""
+    phone_number: Optional[str] = None
+    is_saved_contact: bool = False
+    contact_name: Optional[str] = None
+    caller_display_name: Optional[str] = None
+    caller_profile_text: Optional[str] = None
+    account_age_days: Optional[int] = None
+    call_origin: str = Field("DIRECT_DIAL",
+        description="One of: BROADCAST, FORWARDED_LINK, GROUP_ADD, UNSOLICITED_CHAT, KNOWN_CONTACT, SAVED_CONTACT, DIRECT_DIAL")
+    is_video_call: bool = False
+    chat_messages_before_call: int = 0
+    has_unsolicited_link_before_call: bool = False
+    user_typical_country_codes: Optional[List[str]] = None
+
+class OTTAnalyzeRequest(BaseModel):
+    """REST endpoint body for OTT text + identity analysis."""
+    text: str = Field(..., min_length=1)
+    caller_context: Optional[OTTCallerContext] = None
+    screen_share_active: bool = False
+    screen_share_coercion_detected: bool = False
+    video_extortion_pattern: bool = False
+    links_in_chat: List[str] = Field(default_factory=list)
+    channel: str = Field("WHATSAPP", description="OTT channel: WHATSAPP, TELEGRAM, VOIP, OWN_VOIP")
+
+class OTTFastPathAlert(BaseModel):
+    """Emitted when a fast-path override fires."""
+    triggered: bool = False
+    rule_name: Optional[str] = None
+    label: Optional[str] = None
+    recommended_action: Optional[str] = None
+    risk_floor: Optional[int] = None
+    emergency_actions: List[Dict[str, str]] = Field(default_factory=list)
+
+class OTTAnalysisResult(BaseModel):
+    """Complete OTT analysis result combining NLP + identity + OTT fusion."""
+    session_id: Optional[str] = None
+    ott_risk_score: int = 0
+    ott_trust_score: int = 100
+    classification: str = "SAFE"
+    severity_label: str = "APPEARS SAFE"
+    fast_path_triggered: bool = False
+    fast_path_alert: Optional[OTTFastPathAlert] = None
+    identity_analysis: Optional[Dict[str, Any]] = None
+    screen_share_analysis: Optional[Dict[str, Any]] = None
+    link_analysis: Optional[Dict[str, Any]] = None
+    ott_signals: List[str] = Field(default_factory=list)
+    attribution: Optional[Dict[str, Any]] = None
+    nlp_analysis: Optional[AnalysisResult] = None
+    channel: str = "WHATSAPP"
+    created_at: Optional[str] = None

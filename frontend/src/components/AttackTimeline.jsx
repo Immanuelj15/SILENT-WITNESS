@@ -1,138 +1,170 @@
 import React, { useState } from 'react';
-import { Clock, ShieldAlert, AlertTriangle, ArrowRight, HelpCircle } from 'lucide-react';
+import { Clock, ShieldAlert, AlertTriangle, ArrowRight, CheckCircle2, ChevronRight } from 'lucide-react';
 
 export default function AttackTimeline({ timeline = [] }) {
   const [selectedEvent, setSelectedEvent] = useState(null);
 
-  if (!timeline || timeline.length === 0) {
-    return (
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 backdrop-blur-md">
-        <div className="flex items-center gap-2 mb-3">
-          <Clock className="w-5 h-5 text-indigo-400" />
-          <h3 className="font-semibold text-slate-200">Conversation Attack Timeline</h3>
-        </div>
-        <p className="text-sm text-slate-400 italic">
-          Listening to conversation... Attack progression events will appear chronologically here.
-        </p>
-      </div>
-    );
-  }
+  // If empty timeline, show ready state or simulated progression
+  const displayEvents = timeline && timeline.length > 0 ? timeline : [
+    {
+      timestamp: 0,
+      timeFormatted: '00:02',
+      event: 'Call connected',
+      riskDelta: 0,
+      runningRisk: 5,
+      explanation: 'Inbound session initialized from unsaved contact.',
+      sourceTurn: 'Hello? Can you hear me?',
+    }
+  ];
 
-  const activeSelected = selectedEvent || timeline[timeline.length - 1];
+  const activeSelected = selectedEvent || displayEvents[displayEvents.length - 1];
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl p-5 backdrop-blur-md shadow-xl">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
-            <Clock className="w-5 h-5" />
+    <div className="sw-card" style={{ padding: '20px 24px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ padding: '6px', borderRadius: '8px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
+            <Clock size={16} />
           </div>
           <div>
-            <h3 className="font-bold text-slate-100 text-sm">Conversation Attack Timeline</h3>
-            <p className="text-[11px] text-slate-400">Chronological forensic events with risk attribution</p>
+            <div style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Real-Time Attack Timeline
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+              Chronological turn-by-turn forensic progression with risk contribution
+            </div>
           </div>
         </div>
-        <span className="text-xs px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 font-mono border border-indigo-500/30">
-          {timeline.length} {timeline.length === 1 ? 'Event' : 'Events'} Logged
+
+        <span
+          style={{
+            fontSize: '11px',
+            fontWeight: 600,
+            padding: '3px 8px',
+            borderRadius: '999px',
+            backgroundColor: 'var(--surface-alt)',
+            color: 'var(--text-secondary)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          {displayEvents.length} {displayEvents.length === 1 ? 'Event' : 'Events'} Logged
         </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Timeline Event Sequence */}
-        <div className="lg:col-span-7 space-y-2.5 max-h-72 overflow-y-auto pr-2 custom-scrollbar">
-          {timeline.map((evt, idx) => {
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+        {/* Timeline Event List */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '280px', overflowY: 'auto' }}>
+          {displayEvents.map((evt, idx) => {
             const isSelected = activeSelected && activeSelected.timestamp === evt.timestamp;
-            const isHighRisk = evt.riskDelta >= 25;
+            const delta = evt.riskDelta ?? 0;
+            const isHighRisk = delta >= 20 || (evt.runningRisk ?? 0) >= 60;
 
             return (
               <div
                 key={idx}
                 onClick={() => setSelectedEvent(evt)}
-                className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 shadow-sm ${
-                  isSelected
-                    ? 'bg-slate-800/90 border-indigo-500 ring-1 ring-indigo-500/50 shadow-indigo-500/10'
-                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:bg-slate-900/80'
-                }`}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                  backgroundColor: isSelected ? 'var(--primary-light)' : 'var(--surface)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
               >
-                <div className="mt-0.5">
-                  <span className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700 font-semibold block">
-                    {evt.timeFormatted || `T+${Math.floor(evt.timestamp)}s`}
-                  </span>
+                {/* Time Badge */}
+                <div
+                  style={{
+                    fontSize: '11px',
+                    fontFamily: 'monospace',
+                    fontWeight: 600,
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    backgroundColor: 'var(--surface-alt)',
+                    color: 'var(--text-secondary)',
+                    border: '1px solid var(--border)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {evt.timeFormatted || `T+${Math.floor(evt.timestamp)}s`}
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-semibold text-slate-100 truncate">
-                      {evt.label || evt.eventType}
-                    </span>
-                    <span
-                      className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${
-                        isHighRisk
-                          ? 'bg-red-500/20 text-red-300 border-red-500/40'
-                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                      }`}
-                    >
-                      {evt.riskContribution}
-                    </span>
+                {/* Event Name */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {evt.event || 'Dialogue turn'}
                   </div>
-
-                  <p className="text-xs text-slate-300 line-clamp-1 mt-1 font-sans italic bg-slate-900/60 px-2 py-1 rounded border border-slate-800/60">
-                    "{evt.evidence}"
-                  </p>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    Total Risk: {evt.runningRisk ?? 0} / 100
+                  </div>
                 </div>
+
+                {/* Risk Contribution Badge */}
+                {delta > 0 && (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      backgroundColor: isHighRisk ? 'var(--danger-bg)' : 'var(--warning-bg)',
+                      color: isHighRisk ? 'var(--danger-text)' : 'var(--warning-text)',
+                      border: `1px solid ${isHighRisk ? 'var(--danger-border)' : 'var(--warning-border)'}`,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    +{delta} risk
+                  </span>
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* Selected Event Details (Why This Matters) */}
-        <div className="lg:col-span-5 bg-slate-950/70 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between">
-          {activeSelected ? (
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <HelpCircle className="w-4 h-4 text-cyan-400" />
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-cyan-300">
-                  Why This Matters
-                </h4>
-              </div>
-
-              <div className="mb-3">
-                <span className="text-xs text-slate-400">Event:</span>
-                <p className="text-sm font-medium text-slate-200">
-                  {activeSelected.label || activeSelected.eventType}
-                </p>
-              </div>
-
-              <div className="mb-3">
-                <span className="text-xs text-slate-400">Verbatim Evidence:</span>
-                <p className="text-xs font-mono text-amber-200 bg-amber-950/20 p-2 rounded border border-amber-900/40 mt-1">
-                  "{activeSelected.evidence}"
-                </p>
-              </div>
-
-              <div className="mb-3">
-                <span className="text-xs text-slate-400">Inferred Attack Intent:</span>
-                <p className="text-xs text-indigo-300 font-medium mt-0.5">
-                  {activeSelected.intent}
-                </p>
-              </div>
-
-              <div>
-                <span className="text-xs text-slate-400">Psychological Impact:</span>
-                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                  {activeSelected.whyThisMatters}
-                </p>
-              </div>
+        {/* Selected Event Details Card */}
+        {activeSelected && (
+          <div
+            style={{
+              padding: '14px 16px',
+              backgroundColor: 'var(--bg-main)',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: '0.04em' }}>
+              Event Forensic Detail
             </div>
-          ) : (
-            <p className="text-xs text-slate-400 italic">Select an event to view explanation.</p>
-          )}
 
-          <div className="mt-4 pt-3 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
-            <span>Confidence: {activeSelected ? `${Math.round(activeSelected.confidence * 100)}%` : '--'}</span>
-            <span className="text-rose-400 font-medium">Deterministic Attribution</span>
+            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              {activeSelected.event}
+            </div>
+
+            {activeSelected.sourceTurn && (
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic', borderLeft: '2px solid var(--border)', paddingLeft: '8px' }}>
+                "{activeSelected.sourceTurn}"
+              </div>
+            )}
+
+            <div style={{ fontSize: '12px', color: 'var(--text-primary)', lineHeight: 1.5 }}>
+              {activeSelected.explanation || 'Analyzed via multi-agent reasoning supervisor.'}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: 'auto' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Running Risk</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: (activeSelected.runningRisk ?? 0) > 50 ? 'var(--danger)' : 'var(--primary)' }}>
+                {activeSelected.runningRisk ?? 0} / 100
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

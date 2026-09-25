@@ -1,0 +1,279 @@
+/* ─── OTT Dashboard Styles (Enterprise White + Blue) ───────────────────── */
+
+.ott-dashboard {
+  background: var(--bg-main);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Header */
+.ott-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.ott-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ott-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ott-logo-icon {
+  font-size: 24px;
+}
+
+.ott-logo-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.ott-logo-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ott-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.ott-badge.active {
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+}
+
+.ott-badge.offline {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+/* Screen Share Banner */
+.ott-screenshare-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--critical-bg);
+  border: 1px solid var(--critical-border);
+  border-radius: var(--radius-lg);
+  color: var(--critical);
+}
+
+.ott-screenshare-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ott-screenshare-banner-title {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.ott-screenshare-banner-sub {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.ott-btn-emergency {
+  background: var(--critical);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ott-btn-emergency:hover {
+  background: #991B1B;
+}
+
+/* Fast Path Modal */
+.ott-fp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.ott-fp-box {
+  background: #FFFFFF;
+  border: 2px solid var(--danger);
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 580px;
+  width: 100%;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ott-fp-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ott-fp-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--critical);
+}
+
+.ott-fp-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ott-fp-bullets {
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.ott-fp-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* Grid Layout */
+.ott-main-grid {
+  display: grid;
+  grid-templateColumns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 1100px) {
+  .ott-main-grid {
+    grid-template-columns: 340px 1fr 340px;
+  }
+}
+
+.ott-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Card */
+.ott-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+.ott-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Trust Meter Box */
+.ott-trust-meter-card {
+  text-align: center;
+  padding: 24px 20px;
+}
+
+.ott-trust-number {
+  font-size: 42px;
+  font-weight: 900;
+  color: var(--primary);
+  line-height: 1.1;
+  margin: 8px 0;
+}
+
+.ott-trust-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+/* Controls */
+.ott-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.ott-select, .ott-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.ott-select:focus, .ott-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-focus);
+}
+
+/* Preset buttons */
+.ott-preset-btn {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ott-preset-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--secondary-blue);
+  color: var(--primary);
+}
