@@ -459,3 +459,17 @@ code, pre, .font-mono {
 ::-webkit-scrollbar-thumb:hover {
   background: #94A3B8;
 }
+
+/* Responsive Dashboard Layout Utilities */
+.dashboard-bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 960px) {
+  .dashboard-bottom-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+

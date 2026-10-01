@@ -544,7 +544,7 @@ export default function App() {
                   )}
 
                   {/* Main 2-Column Live Protection Grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '20px' }}>
                     {/* Left Column: Trust Score Bar + Recommended Safety Action */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       <TrustScoreBar
@@ -584,13 +584,13 @@ export default function App() {
                   </div>
 
                   {/* Attack Timeline & Intent Chain Row */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '20px' }}>
                     <AttackTimeline timeline={currentAnalysis.attackTimeline} />
                     <IntentChain intentChain={currentAnalysis.intentChain} />
                   </div>
 
                   {/* Bottom Assistance Modules (Coaching & Emotional Manipulation) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: '20px' }}>
                     {currentAnalysis.coachingPrompt && (
                       <CoachingPromptCard coachingPrompt={currentAnalysis.coachingPrompt} />
                     )}

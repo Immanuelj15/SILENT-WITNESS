@@ -3,8 +3,10 @@ import base64
 import uuid
 import datetime
 import re
+import asyncio
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from starlette.websockets import WebSocketState
 from backend.app.agents.supervisor_agent import SupervisorAgent
 from backend.app.audio.deepfake_detector import VoiceDeepfakeDetector
 from backend.app.audio.preprocessor import AudioPreprocessor
@@ -221,14 +223,15 @@ async def run_live_call_loop(websocket: WebSocket, session_id: str):
                 })
                 break
 
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, asyncio.CancelledError):
         pass
     except Exception as e:
         try:
-            await websocket.send_json({
-                "type": "ERROR",
-                "message": f"Real-time processing error: {str(e)}"
-            })
+            if websocket.client_state == WebSocketState.CONNECTED:
+                await websocket.send_json({
+                    "type": "ERROR",
+                    "message": f"Real-time processing error: {str(e)}"
+                })
         except Exception:
             pass
 

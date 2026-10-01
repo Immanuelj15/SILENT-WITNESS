@@ -607,7 +607,7 @@ export default function DashboardOverview({
       </div>
 
       {/* 5. Bottom 2-Column Section: Real-Time Forensic Stream vs Interactive Attack Sandbox */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: '20px' }}>
+      <div className="dashboard-bottom-grid">
         {/* Left Column: Recent Detected Threat Stream */}
         <div className="sw-card" style={{ padding: '24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
