@@ -1,5 +1,6 @@
 import re
-from typing import List, Dict, Tuple, Optional
+import json
+from typing import List, Dict, Tuple, Optional, Any
 from backend.app.models.schemas import EvidenceItem
 
 class EvidenceVerifier:
@@ -76,3 +77,111 @@ class EvidenceVerifier:
                 rejected.append(f"Rejected unsupported claim: '{phrase}' (not found in transcript)")
 
         return grounded, rejected
+
+
+import hashlib
+import datetime
+from pydantic import BaseModel, Field
+
+
+class MerkleAuditBlock(BaseModel):
+    """
+    Immutable Merkle-linked cryptographic audit record.
+    Chains previous block hashes with current transcript and threat verdict hashes.
+    """
+    block_index: int
+    session_id: str
+    timestamp: str
+    previous_hash: str
+    transcript_hash: str
+    verdict_hash: str
+    merkle_root: str
+    audit_hash: str
+
+
+class MerkleAuditLedger:
+    """
+    In-memory / persistence-ready Merkle ledger for live call sessions.
+    Guarantees tamper-evident traceability for legal forensics and regulatory compliance.
+    """
+    GENESIS_HASH = "0000000000000000000000000000000000000000000000000000000000000000"
+
+    def __init__(self):
+        self._chains: Dict[str, List[MerkleAuditBlock]] = {}
+
+    @staticmethod
+    def sha256(data: str) -> str:
+        return hashlib.sha256(data.encode("utf-8")).hexdigest()
+
+    def record_event(
+        self,
+        session_id: str,
+        transcript: str,
+        verdict: Dict[str, Any]
+    ) -> MerkleAuditBlock:
+        if session_id not in self._chains:
+            self._chains[session_id] = []
+
+        chain = self._chains[session_id]
+        block_index = len(chain)
+        previous_hash = chain[-1].audit_hash if chain else self.GENESIS_HASH
+
+        t_hash = self.sha256(transcript or "")
+        v_hash = self.sha256(json.dumps(verdict, sort_keys=True))
+
+        # Merkle tree root of [t_hash, v_hash]
+        merkle_root = self.sha256(f"{t_hash}:{v_hash}")
+        timestamp = datetime.datetime.utcnow().isoformat()
+
+        # Final chained audit hash: SHA-256(index + timestamp + prev_hash + merkle_root)
+        audit_hash = self.sha256(f"{block_index}:{timestamp}:{previous_hash}:{merkle_root}")
+
+        block = MerkleAuditBlock(
+            block_index=block_index,
+            session_id=session_id,
+            timestamp=timestamp,
+            previous_hash=previous_hash,
+            transcript_hash=t_hash,
+            verdict_hash=v_hash,
+            merkle_root=merkle_root,
+            audit_hash=audit_hash
+        )
+
+        chain.append(block)
+        return block
+
+    def get_latest_hash(self, session_id: str) -> str:
+        chain = self._chains.get(session_id)
+        if chain:
+            return chain[-1].audit_hash
+        return self.GENESIS_HASH
+
+    def get_session_chain(self, session_id: str) -> List[MerkleAuditBlock]:
+        return self._chains.get(session_id, [])
+
+    def verify_chain(self, session_id: str) -> bool:
+        chain = self._chains.get(session_id, [])
+        if not chain:
+            return True
+
+        for i, block in enumerate(chain):
+            expected_prev = chain[i - 1].audit_hash if i > 0 else self.GENESIS_HASH
+            if block.previous_hash != expected_prev:
+                return False
+
+            recalculated_merkle = self.sha256(f"{block.transcript_hash}:{block.verdict_hash}")
+            if block.merkle_root != recalculated_merkle:
+                return False
+
+            recalculated_audit = self.sha256(
+                f"{block.block_index}:{block.timestamp}:{block.previous_hash}:{block.merkle_root}"
+            )
+            if block.audit_hash != recalculated_audit:
+                return False
+
+        return True
+
+
+# Global ledger instance
+merkle_audit_ledger = MerkleAuditLedger()
+

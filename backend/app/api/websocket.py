@@ -2,36 +2,70 @@ import json
 import base64
 import uuid
 import datetime
+import re
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.app.agents.supervisor_agent import SupervisorAgent
 from backend.app.audio.deepfake_detector import VoiceDeepfakeDetector
 from backend.app.audio.preprocessor import AudioPreprocessor
 from backend.app.models.schemas import VoiceAnalysisResult
+from backend.app.core.llm_gateway import llm_gateway
+from backend.app.evidence.verifier import merkle_audit_ledger
 
 ws_router = APIRouter(tags=["WebSocket Real-Time Stream"])
 supervisor = SupervisorAgent()
 deepfake_detector = VoiceDeepfakeDetector()
 
-@ws_router.websocket("/ws/live-call")
-async def live_call_websocket(websocket: WebSocket):
+
+def mask_pii(text: str) -> str:
+    """
+    Regex-based PII Masking: Redacts credit card numbers, bank account numbers,
+    and sensitive OTP codes before agent processing and ledger storage.
+    """
+    if not text:
+        return text
+
+    # 1. Credit Card Numbers (13 to 16 digits, with optional spaces or dashes)
+    masked = re.sub(r'\b(?:\d[ -]*?){13,16}\b', '[CARD_REDACTED]', text)
+
+    # 2. Bank Account Numbers (9 to 18 consecutive digits near account keywords)
+    masked = re.sub(r'(?i)\b(?:account|acct|a/c)[\s#:]*(\d{9,18})\b', r'account [ACCOUNT_REDACTED]', masked)
+
+    # 3. OTPs (4 to 6 digits preceded by keyword or specific OTP patterns)
+    masked = re.sub(r'(?i)\b(otp|code|pin|password|verification)\s*(?:is|:)?\s*(\d{4,6})\b', r'\1 [OTP_REDACTED]', masked)
+    masked = re.sub(r'(?i)(otp[:\s]+)\d{4,6}\b', r'\1[OTP_REDACTED]', masked)
+
+    # 4. Standalone 6-digit numeric codes if transcript mentions bank/verify
+    if any(k in masked.lower() for k in ["sbi", "hdfc", "icici", "bank", "verify", "code"]):
+        masked = re.sub(r'\b\d{6}\b', '[OTP_REDACTED]', masked)
+
+    return masked
+
+
+async def run_live_call_loop(websocket: WebSocket, session_id: str):
     await websocket.accept()
-    session_id = str(uuid.uuid4())
     accumulated_transcript = ""
     chunk_index = 0
     cached_voice_risk = 15.0
 
-    try:
-        # Send initial connection handshake
-        await websocket.send_json({
-            "type": "SESSION_INIT",
-            "sessionId": session_id,
-            "status": "CONNECTED",
-            "trustScore": 100,
-            "riskScore": 0,
-            "classification": "SAFE",
-            "message": "Silent Witness live safety layer activated. Monitoring conversation..."
-        })
+    # Initial session handshake
+    genesis_hash = merkle_audit_ledger.get_latest_hash(session_id)
+    await websocket.send_json({
+        "type": "SESSION_INIT",
+        "sessionId": session_id,
+        "status": "CONNECTED",
+        "threat_level": "SAFE",
+        "composite_risk": 0.05,
+        "identified_scam_type": "None",
+        "live_coaching_directives": ["Silent Witness Guardian armed. Monitoring active communication..."],
+        "audit_hash": genesis_hash,
+        "trustScore": 100,
+        "riskScore": 0,
+        "classification": "SAFE",
+        "message": "Silent Witness live safety layer activated."
+    })
 
+    try:
         while True:
             raw_msg = await websocket.receive_text()
             try:
@@ -41,9 +75,10 @@ async def live_call_websocket(websocket: WebSocket):
 
             msg_type = data.get("type", "TEXT_CHUNK")
             is_final = data.get("isFinal", False)
+            caller_metadata = data.get("callerMetadata", {})
             chunk_index += 1
 
-            voice_res: VoiceAnalysisResult = None
+            voice_res: Optional[VoiceAnalysisResult] = None
 
             # 1. Handle incoming audio chunk (base64 PCM / WAV)
             if msg_type == "AUDIO_CHUNK" and "audioBase64" in data:
@@ -57,15 +92,35 @@ async def live_call_websocket(websocket: WebSocket):
                 except Exception:
                     pass
 
-            # 2. Handle incoming text snippet / speech chunk
+            # 2. Extract and PII-mask incoming speech snippet
             new_text = data.get("text", "")
-            if new_text.strip():
-                if accumulated_transcript:
-                    accumulated_transcript += " " + new_text.strip()
-                else:
-                    accumulated_transcript = new_text.strip()
+            masked_new_text = mask_pii(new_text)
 
-            # 3. Analyze current accumulated context
+            if masked_new_text.strip():
+                if accumulated_transcript:
+                    accumulated_transcript += " " + masked_new_text.strip()
+                else:
+                    accumulated_transcript = masked_new_text.strip()
+
+            # 3. Query Token-Saving LLM Gateway (MockLLMService or OpenRouter)
+            llm_verdict = await llm_gateway.evaluate_dialogue_async(
+                transcript=accumulated_transcript,
+                caller_metadata=caller_metadata
+            )
+
+            threat_level = llm_verdict.get("threat_level", "SAFE")
+            composite_risk = float(llm_verdict.get("composite_risk", 0.05))
+            identified_scam_type = llm_verdict.get("identified_scam_type", "Routine Conversation")
+            live_coaching = llm_verdict.get("live_coaching_directives", [])
+
+            # 4. Record Merkle-linked cryptographic audit block
+            audit_block = merkle_audit_ledger.record_event(
+                session_id=session_id,
+                transcript=accumulated_transcript,
+                verdict=llm_verdict
+            )
+
+            # 5. Process through Multi-Agent Supervisor
             if not voice_res:
                 voice_res = VoiceAnalysisResult(
                     voiceRisk=cached_voice_risk,
@@ -83,83 +138,55 @@ async def live_call_websocket(websocket: WebSocket):
             analysis.id = session_id
             analysis.is_provisional = not is_final
 
-            # 4. Deterministic Real-Time Event Sequence (Section 68 & 69)
-            # a. Transcript Event
+            # Synchronize composite risk & classifications
+            effective_risk_score = max(analysis.riskScore, int(composite_risk * 100))
+            effective_trust_score = max(0, 100 - effective_risk_score)
+            effective_classification = threat_level if threat_level in ["CRITICAL", "HIGH"] else analysis.classification
+
+            # 6. Structured Payload meeting exact Native Android & Web contracts
+            response_payload = {
+                "type": "STREAM_UPDATE",
+                "session_id": session_id,
+                "threat_level": threat_level,
+                "composite_risk": composite_risk,
+                "identified_scam_type": identified_scam_type,
+                "live_coaching_directives": live_coaching,
+                "audit_hash": audit_block.audit_hash,
+                "block_index": audit_block.block_index,
+                "timestamp": audit_block.timestamp,
+                "masked_transcript": accumulated_transcript,
+                # Legacy / Web dashboard compatibility fields
+                "trustScore": effective_trust_score,
+                "riskScore": effective_risk_score,
+                "classification": effective_classification,
+                "confidence": analysis.confidence,
+                "evidence": [e.model_dump() for e in analysis.evidence],
+                "intentChain": analysis.intentChain,
+                "isProvisional": not is_final,
+                "explanation": llm_verdict.get("explanation", analysis.aiExplanation)
+            }
+
+            # Send primary structured evaluation
+            await websocket.send_json(response_payload)
+
+            # Event: transcript update
             await websocket.send_json({
                 "event": "transcript_final" if is_final else "transcript_partial",
                 "data": {
-                    "text": new_text,
+                    "text": masked_new_text,
                     "accumulatedTranscript": accumulated_transcript,
                     "isFinal": is_final
                 }
             })
 
-            # b. Evidence found
-            if analysis.evidence:
-                await websocket.send_json({
-                    "event": "evidence_found",
-                    "data": [e.model_dump() for e in analysis.evidence]
-                })
-
-            # c. Intent & Identity update
-            if analysis.intentChain:
-                await websocket.send_json({
-                    "event": "intent_update",
-                    "data": analysis.intentChain
-                })
-
-            if analysis.identityAudit:
-                await websocket.send_json({
-                    "event": "identity_update",
-                    "data": analysis.identityAudit
-                })
-
-            # d. Risk & Trust score update
-            await websocket.send_json({
-                "event": "risk_update",
-                "data": {
-                    "riskScore": analysis.riskScore,
-                    "trustScore": analysis.trustScore,
-                    "status": analysis.classification,
-                    "confidence": analysis.confidence,
-                    "evidenceConfidence": analysis.evidenceConfidence,
-                    "isProvisional": not is_final
-                }
-            })
-
-            # e. Tier 2 & 3 Real-Time Events
-            if analysis.scriptFingerprint and analysis.scriptFingerprint.get("matched"):
-                await websocket.send_json({
-                    "event": "script_match",
-                    "data": analysis.scriptFingerprint
-                })
-
-            if analysis.emotionAnalysis:
-                await websocket.send_json({
-                    "event": "emotion_update",
-                    "data": analysis.emotionAnalysis
-                })
-
-            if analysis.coaching:
-                await websocket.send_json({
-                    "event": "coaching_prompt",
-                    "data": analysis.coaching
-                })
-
-            # f. Active Intervention
-            if analysis.intervention:
-                await websocket.send_json({
-                    "event": "intervention_triggered",
-                    "data": analysis.intervention
-                })
-
-            # Consolidated LIVE_UPDATE for backwards compatibility
+            # Event: LIVE_UPDATE for web app compatibility
             await websocket.send_json({
                 "type": "LIVE_UPDATE",
                 "sessionId": session_id,
                 "chunkIndex": chunk_index,
                 "isProvisional": not is_final,
                 "timestamp": datetime.datetime.utcnow().isoformat(),
+                "payload": response_payload,
                 "analysis": analysis.model_dump()
             })
 
@@ -176,7 +203,9 @@ async def live_call_websocket(websocket: WebSocket):
                 )
                 await websocket.send_json({
                     "event": "report_ready",
-                    "data": report_data
+                    "data": report_data,
+                    "audit_chain_verified": merkle_audit_ledger.verify_chain(session_id),
+                    "latest_audit_hash": audit_block.audit_hash
                 })
                 await websocket.send_json({
                     "type": "CALL_CONCLUDED",
@@ -187,7 +216,6 @@ async def live_call_websocket(websocket: WebSocket):
                 break
 
     except WebSocketDisconnect:
-        # Graceful disconnect
         pass
     except Exception as e:
         try:
@@ -197,3 +225,20 @@ async def live_call_websocket(websocket: WebSocket):
             })
         except Exception:
             pass
+
+
+@ws_router.websocket("/ws/live-call/{session_id}")
+async def live_call_session_websocket(websocket: WebSocket, session_id: str):
+    """
+    Dedicated Session WebSocket for Native Android & Companion Clients.
+    """
+    await run_live_call_loop(websocket, session_id)
+
+
+@ws_router.websocket("/ws/live-call")
+async def live_call_default_websocket(websocket: WebSocket):
+    """
+    Auto-assigned Session WebSocket for Web Clients.
+    """
+    session_id = str(uuid.uuid4())
+    await run_live_call_loop(websocket, session_id)

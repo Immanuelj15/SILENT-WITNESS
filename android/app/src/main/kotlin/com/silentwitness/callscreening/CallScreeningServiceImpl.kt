@@ -6,6 +6,8 @@ import android.telecom.Call
 import android.telecom.CallScreeningService
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.silentwitness.network.WebSocketClientManager
+import com.silentwitness.overlay.GuardianOverlayService
 
 /**
  * Mode A: Android SIM Call Protection.
@@ -25,15 +27,13 @@ class CallScreeningServiceImpl : CallScreeningService() {
 
         Log.i(TAG, "Screening incoming cellular call from: $rawNumber")
 
-        // 1. Evaluate Caller Number with Backend Risk Engine or Local Cache
         val isSpamPattern = isKnownSpamPrefix(rawNumber)
-
         val responseBuilder = CallResponse.Builder()
 
         if (isSpamPattern) {
             Log.w(TAG, "High-risk robocall/scam pattern matched for $rawNumber. Silencing call.")
             responseBuilder
-                .setDisallowCall(false) // Let user decide if critical, or setDisallowCall(true) to auto-block
+                .setDisallowCall(false) // Let user decide if critical, or auto-block
                 .setRejectCall(false)
                 .setSilenceCall(true)
                 .setSkipCallLog(false)
@@ -46,11 +46,18 @@ class CallScreeningServiceImpl : CallScreeningService() {
                 .setSilenceCall(false)
         }
 
+        // Arm Guardian Protection Overlay for the active call
+        try {
+            GuardianOverlayService.startService(applicationContext)
+            WebSocketClientManager.instance.connect()
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice launching overlay service from screening service: ${e.message}")
+        }
+
         respondToCall(callDetails, responseBuilder.build())
     }
 
     private fun isKnownSpamPrefix(number: String): Boolean {
-        // High frequency robocall/telemarketing prefix screening
         val clean = number.replace(Regex("[\\s\\-\\(\\)]"), "")
         return clean.startsWith("+91140") || clean.startsWith("140") || clean.startsWith("+4470")
     }

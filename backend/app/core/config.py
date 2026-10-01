@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     LLM_API_BASE: str = "http://localhost:8080/v1"
     LLM_MAX_TOKENS: int = 512
     LLM_TEMPERATURE: float = 0.1
+    OPENROUTER_API_KEY: str = "MOCK_DEV"
+    OPENROUTER_MODEL: str = "meta-llama/llama-3.3-70b-instruct"
 
     # Privacy & Storage
     ENABLE_AUDIO_STORAGE: bool = False

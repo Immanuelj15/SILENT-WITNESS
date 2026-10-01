@@ -1,33 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.silentwitness">
 
-    <!-- Section 30: Transparent Android Permissions -->
-    <!-- Cellular Call Screening (Mode A) -->
+    <!-- Telephony & Call Screening Permissions -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
     <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
 
-    <!-- Network & Backend WebSocket -->
+    <!-- Overlay & Foreground Services -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Network & Backend Communication -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- User Protection Notifications -->
+    <!-- Notifications & User Alerts -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Microphone (Only used during user-authorized Own-VoIP or companion audio recording) -->
+    <!-- Companion Audio Processing -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
+        android:name=".SilentWitnessApp"
         android:allowBackup="false"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@android:drawable/ic_dialog_shield"
         android:label="Silent Witness"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@android:drawable/ic_dialog_shield"
         android:supportsRtl="true"
-        android:theme="@style/Theme.SilentWitness">
+        android:theme="@style/Theme.SilentWitness"
+        android:usesCleartextTraffic="true">
 
-        <!-- Android CallScreeningService: Mode A SIM Call Protection -->
+        <!-- Android CallScreeningService: Mode A SIM Call Interception -->
         <service
             android:name=".callscreening.CallScreeningServiceImpl"
             android:permission="android.permission.BIND_SCREENING_SERVICE"
@@ -37,9 +45,21 @@
             </intent-filter>
         </service>
 
+        <!-- Guardian Floating Overlay Foreground Service -->
+        <service
+            android:name=".overlay.GuardianOverlayService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Real-time scam alert overlay during phone calls" />
+        </service>
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
+            android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.SilentWitness">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
