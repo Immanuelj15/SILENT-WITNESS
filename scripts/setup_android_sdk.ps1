@@ -97,4 +97,17 @@ if (Test-Path $sdkManagerBat) {
 Write-Host "`n=== [5/5] Setup Complete! Building Debug APK ===" -ForegroundColor Green
 $androidDir = Join-Path $PSScriptRoot "..\android"
 Set-Location $androidDir
-.\gradlew.bat assembleDebug
+
+# Ensure local.properties specifies the installed SDK directory
+$localProps = Join-Path $androidDir "local.properties"
+$escapedSdk = $InstallDir.Replace("\", "\\")
+"sdk.dir=$escapedSdk" | Out-File -FilePath $localProps -Encoding ascii
+
+$cachedGradle = Get-ChildItem -Path "$HOME\.gradle\wrapper\dists" -Filter "gradle.bat" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($cachedGradle) {
+    Write-Host "Using pre-cached Gradle at: $($cachedGradle.FullName)" -ForegroundColor Green
+    & $cachedGradle.FullName assembleDebug
+} else {
+    .\gradlew.bat assembleDebug
+}
+

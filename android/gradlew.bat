@@ -57,22 +57,37 @@ echo location of your Java installation.
 goto fail
 
 :execute
-@rem Setup classpath
-set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
-
-if exist "%CLASSPATH%" goto runWrapper
-
+@rem Check if gradle is already in PATH
 where gradle >nul 2>nul
 if %ERRORLEVEL% equ 0 (
     gradle %*
     goto end
 )
 
+@rem Check if Gradle is present in user's gradle distribution cache
+for /d %%D in ("%USERPROFILE%\.gradle\wrapper\dists\gradle-8.14-bin\*") do (
+    if exist "%%D\gradle-8.14\bin\gradle.bat" (
+        "%%D\gradle-8.14\bin\gradle.bat" %*
+        goto end
+    )
+)
+for /d %%D in ("%USERPROFILE%\.gradle\wrapper\dists\gradle-8.14-all\*") do (
+    if exist "%%D\gradle-8.14\bin\gradle.bat" (
+        "%%D\gradle-8.14\bin\gradle.bat" %*
+        goto end
+    )
+)
+
+@rem Setup wrapper classpath
+set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+
+if exist "%CLASSPATH%" goto runWrapper
+
 echo Downloading gradle-wrapper.jar...
 powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar', '%CLASSPATH%')"
 
 :runWrapper
-"%JAVACMD%" -Dorg.gradle.appname=%APP_BASE_NAME% -jar "%CLASSPATH%" %*
+"%JAVACMD%" %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
 if %ERRORLEVEL% equ 0 goto end
 
 :fail

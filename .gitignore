@@ -35,3 +35,10 @@ silent_witness.db
 # OS
 .DS_Store
 Thumbs.db
+
+# Android
+android/.gradle/
+android/**/build/
+android/local.properties
+*.apk
+*.aab

@@ -70,7 +70,7 @@ fi
 WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
 
 if [ -f "$WRAPPER_JAR" ]; then
-    exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "-Dorg.gradle.appname=$APP_BASE_NAME" -jar "$WRAPPER_JAR" "$@"
+    exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "-Dorg.gradle.appname=$APP_BASE_NAME" -classpath "$WRAPPER_JAR" org.gradle.wrapper.GradleWrapperMain "$@"
 elif command -v gradle >/dev/null 2>&1; then
     exec gradle "$@"
 else
@@ -79,7 +79,7 @@ else
     mkdir -p "$APP_HOME/gradle/wrapper"
     curl -sLo "$WRAPPER_JAR" "https://raw.githubusercontent.com/gradle/gradle/v8.4.0/gradle/wrapper/gradle-wrapper.jar"
     if [ -f "$WRAPPER_JAR" ]; then
-        exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "-Dorg.gradle.appname=$APP_BASE_NAME" -jar "$WRAPPER_JAR" "$@"
+        exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS "-Dorg.gradle.appname=$APP_BASE_NAME" -classpath "$WRAPPER_JAR" org.gradle.wrapper.GradleWrapperMain "$@"
     else
         die "ERROR: Could not find or download gradle-wrapper.jar, and gradle is not in PATH."
     fi

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.silentwitness">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Telephony & Call Screening Permissions -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -28,9 +27,9 @@
     <application
         android:name=".SilentWitnessApp"
         android:allowBackup="false"
-        android:icon="@android:drawable/ic_dialog_shield"
+        android:icon="@drawable/ic_launcher"
         android:label="Silent Witness"
-        android:roundIcon="@android:drawable/ic_dialog_shield"
+        android:roundIcon="@drawable/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/Theme.SilentWitness"
         android:usesCleartextTraffic="true">
