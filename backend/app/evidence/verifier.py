@@ -99,6 +99,11 @@ class MerkleAuditBlock(BaseModel):
     audit_hash: str
 
 
+class AuditTamperingDetectedError(Exception):
+    """Raised when Merkle parent-child hash verification fails, indicating record alteration."""
+    pass
+
+
 class MerkleAuditLedger:
     """
     In-memory / persistence-ready Merkle ledger for live call sessions.
@@ -160,26 +165,44 @@ class MerkleAuditLedger:
         return self._chains.get(session_id, [])
 
     def verify_chain(self, session_id: str) -> bool:
+        try:
+            self.assert_chain_integrity(session_id)
+            return True
+        except AuditTamperingDetectedError:
+            return False
+
+    def assert_chain_integrity(self, session_id: str) -> None:
+        """
+        Validates the strict parent-child Merkle hash chain.
+        Raises AuditTamperingDetectedError immediately if any block or root has been modified.
+        """
         chain = self._chains.get(session_id, [])
         if not chain:
-            return True
+            return
 
         for i, block in enumerate(chain):
             expected_prev = chain[i - 1].audit_hash if i > 0 else self.GENESIS_HASH
             if block.previous_hash != expected_prev:
-                return False
+                raise AuditTamperingDetectedError(
+                    f"Audit tampering detected in session '{session_id}' at block {block.block_index}: "
+                    f"Previous hash mismatch. Expected '{expected_prev}', got '{block.previous_hash}'."
+                )
 
             recalculated_merkle = self.sha256(f"{block.transcript_hash}:{block.verdict_hash}")
             if block.merkle_root != recalculated_merkle:
-                return False
+                raise AuditTamperingDetectedError(
+                    f"Audit tampering detected in session '{session_id}' at block {block.block_index}: "
+                    f"Merkle root mismatch. Content hash was altered!"
+                )
 
             recalculated_audit = self.sha256(
                 f"{block.block_index}:{block.timestamp}:{block.previous_hash}:{block.merkle_root}"
             )
             if block.audit_hash != recalculated_audit:
-                return False
-
-        return True
+                raise AuditTamperingDetectedError(
+                    f"Audit tampering detected in session '{session_id}' at block {block.block_index}: "
+                    f"Chained block hash mismatch. Block header was altered!"
+                )
 
 
 # Global ledger instance

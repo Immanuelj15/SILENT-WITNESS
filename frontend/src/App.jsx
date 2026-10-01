@@ -32,7 +32,8 @@ import ChannelSelector from './components/ChannelSelector';
 import {
   Mic, MicOff, Send, Radio, Sparkles, AlertCircle, RefreshCw,
   FileText, ShieldAlert, CheckCircle, Clock, Smartphone,
-  PhoneOff, ShieldCheck, Settings as SettingsIcon, MessageSquarePlus
+  PhoneOff, ShieldCheck, Settings as SettingsIcon, MessageSquarePlus,
+  Volume2, VolumeX, Shield, Download
 } from 'lucide-react';
 import apiClient from './utils/apiClient';
 
@@ -56,6 +57,8 @@ export default function App() {
   const [liveTranscript, setLiveTranscript] = useState('');
   const [manualInputText, setManualInputText] = useState('');
   const [isProvisional, setIsProvisional] = useState(true);
+  const [isAudioMuted, setIsAudioMuted] = useState(false);
+  const [isShieldActive, setIsShieldActive] = useState(true);
 
   // Current Analysis Data
   const [currentAnalysis, setCurrentAnalysis] = useState({
@@ -108,6 +111,21 @@ export default function App() {
     return () => clearInterval(timerRef.current);
   }, [isRecording]);
 
+  // Global unmount cleanup to avoid memory and audio stream leaks
+  useEffect(() => {
+    return () => {
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
+
   // Screen share emergency alert
   useEffect(() => {
     if (currentAnalysis?.screenShareAnalysis?.is_screen_share_demanded) {
@@ -129,16 +147,22 @@ export default function App() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'LIVE_UPDATE' || data.type === 'STREAM_UPDATE') {
+            const payload = data.payload || data;
             setCurrentAnalysis(prev => ({
               ...prev,
-              ...data.payload,
-              trustScore: data.payload.trustScore ?? prev.trustScore,
-              riskScore: data.payload.riskScore ?? prev.riskScore,
+              ...payload,
+              trustScore: payload.trustScore ?? prev.trustScore,
+              riskScore: payload.riskScore ?? prev.riskScore,
+              classification: payload.classification ?? prev.classification,
+              identified_scam_type: payload.identified_scam_type ?? prev.identified_scam_type,
+              live_coaching_directives: payload.live_coaching_directives ?? prev.live_coaching_directives,
+              audit_hash: payload.audit_hash ?? prev.audit_hash
             }));
-            if (data.payload.transcript) {
-              setLiveTranscript(data.payload.transcript);
+            const updatedTranscript = payload.masked_transcript || payload.transcript;
+            if (updatedTranscript) {
+              setLiveTranscript(updatedTranscript);
             }
-            setIsProvisional(Boolean(data.payload.isProvisional));
+            setIsProvisional(Boolean(payload.isProvisional));
           }
         } catch (err) {
           console.error("Error parsing WebSocket message:", err);
@@ -226,6 +250,48 @@ export default function App() {
     } catch (e) {
       console.warn("Analysis notice:", e);
     }
+  };
+
+  const handleToggleMute = () => {
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !track.enabled;
+      });
+    }
+    setIsAudioMuted(prev => !prev);
+  };
+
+  const handleToggleShield = () => {
+    setIsShieldActive(prev => !prev);
+  };
+
+  const handleTerminateCall = () => {
+    handleStopLiveCall();
+    handleOpenReport();
+  };
+
+  const handleExportEvidence = () => {
+    const evidencePackage = {
+      export_version: "1.0",
+      system: "SILENT WITNESS AI DEFENSE",
+      session_id: currentAnalysis.id || `SW-LIVE-${Date.now()}`,
+      exported_at: new Date().toISOString(),
+      merkle_audit_hash: currentAnalysis.audit_hash || "GENESIS_ROOT",
+      threat_verdict: currentAnalysis.classification,
+      trust_score: currentAnalysis.trustScore,
+      risk_score: currentAnalysis.riskScore,
+      scam_type: currentAnalysis.identified_scam_type || currentAnalysis.category,
+      transcript: liveTranscript,
+      evidence_items: currentAnalysis.evidence || [],
+      directives: currentAnalysis.live_coaching_directives || currentAnalysis.actions || []
+    };
+    const blob = new Blob([JSON.stringify(evidencePackage, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `SilentWitness-Evidence-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // Open Safety Report
@@ -366,25 +432,58 @@ export default function App() {
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      {/* Toggle Shield Button */}
+                      <button
+                        onClick={handleToggleShield}
+                        className={isShieldActive ? "btn-secondary" : "btn-ghost"}
+                        style={{
+                          padding: '8px 12px',
+                          color: isShieldActive ? 'var(--primary)' : 'var(--text-muted)',
+                          borderColor: isShieldActive ? 'var(--primary)' : 'var(--border)'
+                        }}
+                        title={isShieldActive ? "Active Defense Shield Armed" : "Shield Paused"}
+                      >
+                        {isShieldActive ? <ShieldCheck size={15} /> : <Shield size={15} />}
+                        <span>{isShieldActive ? "Shield Active" : "Shield Paused"}</span>
+                      </button>
+
+                      {/* Mute Audio Button */}
+                      <button
+                        onClick={handleToggleMute}
+                        className={isAudioMuted ? "btn-danger" : "btn-secondary"}
+                        style={{ padding: '8px 12px' }}
+                        title={isAudioMuted ? "Microphone Muted" : "Mute Microphone Audio"}
+                      >
+                        {isAudioMuted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+                        <span>{isAudioMuted ? "Unmute Audio" : "Mute Audio"}</span>
+                      </button>
+
+                      {/* Start / Terminate Call Button */}
                       {!isRecording ? (
-                        <button onClick={handleStartLiveCall} className="btn-primary" style={{ padding: '8px 16px' }}>
+                        <button onClick={handleStartLiveCall} className="btn-primary" style={{ padding: '8px 14px' }}>
                           <Mic size={15} />
                           <span>Start Monitoring</span>
                         </button>
                       ) : (
-                        <button onClick={handleStopLiveCall} className="btn-danger" style={{ padding: '8px 16px' }}>
-                          <MicOff size={15} />
-                          <span>Stop Monitoring</span>
+                        <button onClick={handleTerminateCall} className="btn-danger" style={{ padding: '8px 14px' }}>
+                          <PhoneOff size={15} />
+                          <span>Terminate Call</span>
                         </button>
                       )}
 
-                      <button onClick={handleOpenReport} className="btn-secondary" style={{ padding: '8px 14px' }}>
+                      {/* Export Evidence Button */}
+                      <button onClick={handleExportEvidence} className="btn-secondary" style={{ padding: '8px 12px' }} title="Export Cryptographic Evidence Ledger">
+                        <Download size={15} />
+                        <span>Export Evidence</span>
+                      </button>
+
+                      <button onClick={handleOpenReport} className="btn-secondary" style={{ padding: '8px 12px' }}>
                         <FileText size={15} />
                         <span>Safety Report</span>
                       </button>
 
-                      <button onClick={() => setIsMobileModalOpen(true)} className="btn-ghost" style={{ padding: '8px 12px' }} title="Preview Android Mobile Alert">
+                      <button onClick={() => setIsMobileModalOpen(true)} className="btn-ghost" style={{ padding: '8px 10px' }} title="Preview Android Mobile Alert">
                         <Smartphone size={16} />
                       </button>
                     </div>

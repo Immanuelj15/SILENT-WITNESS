@@ -32,10 +32,14 @@ def test_mock_llm_benign():
     assert result["composite_risk"] <= 0.10
 
 def test_pii_masking():
-    raw_text = "My card number is 4111 2222 3333 4444 and my otp is 987654 for account 123456789012."
+    raw_text = "My card number is 4111 2222 3333 4444, cvv is 321, expiry 05/28, and my otp is 987654 for account 123456789012."
     masked = mask_pii(raw_text)
     assert "4111 2222 3333 4444" not in masked
     assert "[CARD_REDACTED]" in masked
+    assert "321" not in masked
+    assert "[CVV_REDACTED]" in masked
+    assert "05/28" not in masked
+    assert "[EXPIRY_REDACTED]" in masked
     assert "987654" not in masked
     assert "[OTP_REDACTED]" in masked
     assert "123456789012" not in masked
@@ -54,3 +58,38 @@ def test_merkle_audit_ledger_chaining():
 
     # Verify cryptographic integrity
     assert merkle_audit_ledger.verify_chain(session_id) is True
+    merkle_audit_ledger.assert_chain_integrity(session_id)
+
+
+def test_merkle_tampering_detection_raises_exception():
+    import pytest
+    from backend.app.evidence.verifier import AuditTamperingDetectedError
+
+    tampered_session = "tampered-session-1"
+    b0 = merkle_audit_ledger.record_event(tampered_session, "Legitimate audio", {"risk": 0.05})
+    b1 = merkle_audit_ledger.record_event(tampered_session, "Second chunk", {"risk": 0.10})
+
+    assert merkle_audit_ledger.verify_chain(tampered_session) is True
+
+    # Intentionally corrupt b0 transcript hash
+    chain = merkle_audit_ledger.get_session_chain(tampered_session)
+    original_hash = chain[0].transcript_hash
+    chain[0].transcript_hash = "deadbeef" * 8
+
+    # Must fail validation and raise AuditTamperingDetectedError
+    assert merkle_audit_ledger.verify_chain(tampered_session) is False
+    with pytest.raises(AuditTamperingDetectedError):
+        merkle_audit_ledger.assert_chain_integrity(tampered_session)
+
+    # Restore
+    chain[0].transcript_hash = original_hash
+
+
+def test_mock_llm_latency_under_300ms():
+    import time
+    start = time.perf_counter()
+    for _ in range(50):
+        MockLLMService.evaluate("This is an urgent call from CBI Mumbai police regarding your passport and digital arrest.")
+    elapsed = (time.perf_counter() - start) / 50.0
+    # Average response must be strictly under 0.3s (300ms), typically < 1ms
+    assert elapsed < 0.300, f"MockLLM evaluation too slow: {elapsed*1000:.2f}ms"

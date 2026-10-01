@@ -217,20 +217,36 @@ export default function DemoWalkthrough({ onRunLiveScenario }) {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
             <button onClick={handleReset} className="btn-secondary" style={{ padding: '8px 14px' }}>
               <RotateCcw size={14} />
               <span>Reset</span>
             </button>
             <button
               onClick={handleNext}
-              className="btn-primary"
+              className="btn-secondary"
               disabled={currentStepIndex >= steps.length - 1}
               style={{ padding: '8px 16px' }}
             >
               <span>Advance Step ({currentStepIndex + 1}/{steps.length})</span>
               <ArrowRight size={14} />
             </button>
+            {onRunLiveScenario && (
+              <button
+                onClick={() => onRunLiveScenario(currentStep.text)}
+                className="btn-primary"
+                style={{
+                  padding: '8px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+                title="Inject this attack phrase into live AI monitoring HUD"
+              >
+                <Play size={14} />
+                <span>Inject into Live Monitor</span>
+              </button>
+            )}
           </div>
         </div>
 

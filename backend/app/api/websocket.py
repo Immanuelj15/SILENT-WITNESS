@@ -31,13 +31,19 @@ def mask_pii(text: str) -> str:
     # 2. Bank Account Numbers (9 to 18 consecutive digits near account keywords)
     masked = re.sub(r'(?i)\b(?:account|acct|a/c)[\s#:]*(\d{9,18})\b', r'account [ACCOUNT_REDACTED]', masked)
 
-    # 3. OTPs (4 to 6 digits preceded by keyword or specific OTP patterns)
-    masked = re.sub(r'(?i)\b(otp|code|pin|password|verification)\s*(?:is|:)?\s*(\d{4,6})\b', r'\1 [OTP_REDACTED]', masked)
+    # 3. CVVs and Security Codes (3 to 4 digits near cvv/cvc keyword)
+    masked = re.sub(r'(?i)\b(cvv|cvc|security code|cid)\s*(?:is|:)?\s*(\d{3,4})\b', r'\1 [CVV_REDACTED]', masked)
+
+    # 4. OTPs and PINs (4 to 6 digits preceded by keyword or specific OTP patterns)
+    masked = re.sub(r'(?i)\b(otp|one time password|pin|upi pin|password|verification)\s*(?:is|:)?\s*(\d{4,6})\b', r'\1 [OTP_REDACTED]', masked)
     masked = re.sub(r'(?i)(otp[:\s]+)\d{4,6}\b', r'\1[OTP_REDACTED]', masked)
 
-    # 4. Standalone 6-digit numeric codes if transcript mentions bank/verify
-    if any(k in masked.lower() for k in ["sbi", "hdfc", "icici", "bank", "verify", "code"]):
+    # 5. Standalone 6-digit numeric codes if transcript mentions banking keywords
+    if any(k in masked.lower() for k in ["sbi", "hdfc", "icici", "axis", "bank", "verify", "code", "transaction"]):
         masked = re.sub(r'\b\d{6}\b', '[OTP_REDACTED]', masked)
+
+    # 6. Card Expiry Dates (MM/YY or MM/YYYY)
+    masked = re.sub(r'\b(0[1-9]|1[0-2])\/([2-3][0-9])\b', '[EXPIRY_REDACTED]', masked)
 
     return masked
 

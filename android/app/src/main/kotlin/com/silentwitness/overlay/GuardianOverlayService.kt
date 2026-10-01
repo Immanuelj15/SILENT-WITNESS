@@ -81,7 +81,12 @@ class GuardianOverlayService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 hideOverlay()
-                stopForeground(true)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
                 stopSelf()
             }
             ACTION_SIMULATE_ALERT -> {
