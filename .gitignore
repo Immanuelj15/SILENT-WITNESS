@@ -21,6 +21,8 @@ wheels/
 .installed.cfg
 *.egg
 .pytest_cache/
+.env
+.env.local
 
 # Node
 node_modules/
