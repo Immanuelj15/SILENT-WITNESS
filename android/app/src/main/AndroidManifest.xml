@@ -45,11 +45,20 @@
             </intent-filter>
         </service>
 
+        <!-- BroadcastReceiver for cellular phone call ringing / offhook states -->
+        <receiver
+            android:name=".callscreening.PhoneCallReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
         <!-- Guardian Floating Overlay Foreground Service -->
         <service
             android:name=".overlay.GuardianOverlayService"
             android:enabled="true"
-            android:exported="false"
+            android:exported="true"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"

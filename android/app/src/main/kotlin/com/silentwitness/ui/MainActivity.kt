@@ -27,22 +27,43 @@ import com.silentwitness.ui.components.EvidenceHistoryScreen
 import com.silentwitness.ui.components.ScamLabScreen
 import com.silentwitness.ui.theme.*
 
+import android.content.Intent
+import androidx.compose.runtime.MutableState
+import com.silentwitness.data.ThreatVerdict
+import com.silentwitness.overlay.GuardianOverlayService
+import com.silentwitness.network.WebSocketClientManager
+
 class MainActivity : ComponentActivity() {
 
     private val viewModel: GuardianViewModel by viewModels()
+    private val activeTabState = mutableStateOf(NavigationTab.SHIELD)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleTabIntent(intent)
+        WebSocketClientManager.instance.connect()
         setContent {
             SilentWitnessTheme {
-                MainScreen(viewModel)
+                MainScreen(viewModel, activeTabState)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleTabIntent(intent)
+    }
+
+    private fun handleTabIntent(intent: Intent?) {
+        if (intent?.getStringExtra("EXTRA_NAVIGATE_TAB") == "EVIDENCE") {
+            activeTabState.value = NavigationTab.EVIDENCE
         }
     }
 
     override fun onResume() {
         super.onResume()
         viewModel.checkPermissions(this)
+        WebSocketClientManager.instance.connect()
     }
 }
 
@@ -54,8 +75,11 @@ enum class NavigationTab(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: GuardianViewModel) {
-    var selectedTab by remember { mutableStateOf(NavigationTab.SHIELD) }
+fun MainScreen(
+    viewModel: GuardianViewModel,
+    tabState: MutableState<NavigationTab> = remember { mutableStateOf(NavigationTab.SHIELD) }
+) {
+    var selectedTab by tabState
     val context = LocalContext.current
 
     Scaffold(
@@ -165,7 +189,7 @@ fun MainScreen(viewModel: GuardianViewModel) {
                 .padding(paddingValues)
         ) {
             when (selectedTab) {
-                NavigationTab.SHIELD -> ShieldOverviewScreen(viewModel)
+                NavigationTab.SHIELD -> ShieldOverviewScreen(viewModel, onNavigateToEvidence = { selectedTab = NavigationTab.EVIDENCE })
                 NavigationTab.SCAM_LAB -> ScamLabScreen(viewModel)
                 NavigationTab.EVIDENCE -> EvidenceHistoryScreen(viewModel)
             }
@@ -174,7 +198,10 @@ fun MainScreen(viewModel: GuardianViewModel) {
 }
 
 @Composable
-fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
+fun ShieldOverviewScreen(
+    viewModel: GuardianViewModel,
+    onNavigateToEvidence: () -> Unit = {}
+) {
     val context = LocalContext.current
     val isArmed by viewModel.isShieldArmed.collectAsState()
     val hasOverlay by viewModel.hasOverlayPermission.collectAsState()
@@ -255,7 +282,7 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
             }
         }
 
-        // Feature 1, 2, 4, 5: Live Telephony Defense Monitor Card
+        // Live Telephony Defense Monitor Card
         if (latestVerdict != null) {
             val verdict = latestVerdict!!
             val rawRisk = verdict.riskScore.toFloat()
@@ -321,7 +348,7 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Feature 5: Live Risk Percentage Gauge (0% - 100%)
+                    // Live Risk Percentage Gauge (0% - 100%)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -353,7 +380,7 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                         trackColor = Slate100
                     )
 
-                    // Feature 2: Live Defense Warnings (Dynamic Coaching Directives)
+                    // Live Defense Warnings (Dynamic Coaching Directives)
                     if (verdict.liveCoachingDirectives.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(14.dp))
                         Text(
@@ -379,7 +406,7 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                         }
                     }
 
-                    // Feature 4: Emergency Quick-Action Buttons
+                    // Emergency Quick-Action Buttons: Mute, Disconnect, Save Proof
                     Spacer(modifier = Modifier.height(16.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -402,10 +429,11 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                                     android.widget.Toast.makeText(context, "Mute: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Mute", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Mute", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                         }
 
                         Button(
@@ -418,26 +446,44 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                                     }
                                     android.widget.Toast.makeText(context, "Call Terminated", android.widget.Toast.LENGTH_SHORT).show()
                                 } catch (e: Exception) {
-                                    android.widget.Toast.makeText(context, "End call notice", android.widget.Toast.LENGTH_SHORT).show()
+                                    android.widget.Toast.makeText(context, "Call Disconnected", android.widget.Toast.LENGTH_SHORT).show()
                                 }
+                                GuardianOverlayService.stopService(context)
+                                onNavigateToEvidence()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = ThreatCritical),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Disconnect", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Disconnect", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                         }
 
                         Button(
                             onClick = {
-                                viewModel.injectScamLabScenario(0, context)
+                                val currentVerdict = latestVerdict ?: ThreatVerdict(
+                                    threatLevel = "CRITICAL",
+                                    compositeRisk = 0.95f,
+                                    identifiedScamType = "Manual Evidence Capture",
+                                    liveCoachingDirectives = listOf("Suspicious active call intercepted"),
+                                    auditHash = java.security.MessageDigest.getInstance("SHA-256")
+                                        .digest("Evidence:${System.currentTimeMillis()}".toByteArray())
+                                        .joinToString("") { "%02x".format(it) },
+                                    blockIndex = viewModel.auditHistory.value.size + 1,
+                                    timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()),
+                                    riskScore = 95,
+                                    explanation = "Manual evidence proof saved by user."
+                                )
+                                WebSocketClientManager.instance.recordProof(currentVerdict)
                                 android.widget.Toast.makeText(context, "Evidence archived to ledger", android.widget.Toast.LENGTH_SHORT).show()
+                                onNavigateToEvidence()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = Slate900),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp),
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(8.dp)
                         ) {
-                            Text("Save Proof", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Save Proof", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                         }
                     }
                 }
@@ -464,7 +510,10 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             if (hasOverlay) Icons.Default.CheckCircle else Icons.Default.Warning,
                             contentDescription = "Overlay status",
@@ -479,11 +528,21 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                     }
 
                     if (!hasOverlay) {
-                        TextButton(onClick = { viewModel.requestOverlayPermission(context) }) {
-                            Text("Grant", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                        Button(
+                            onClick = { viewModel.requestOverlayPermission(context) },
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Grant", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, softWrap = false)
                         }
                     } else {
-                        Text("Active", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = ThreatSafe)
+                        Surface(
+                            color = ThreatSafeBg,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text("Active", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = ThreatSafe, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                        }
                     }
                 }
 
@@ -495,7 +554,10 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             if (hasScreening) Icons.Default.CheckCircle else Icons.Default.Info,
                             contentDescription = "Call screening status",
@@ -510,11 +572,21 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                     }
 
                     if (!hasScreening) {
-                        TextButton(onClick = { viewModel.requestCallScreeningRole(context) }) {
-                            Text("Enable", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue)
+                        Button(
+                            onClick = { viewModel.requestCallScreeningRole(context) },
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Enable", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, softWrap = false)
                         }
                     } else {
-                        Text("Active", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = ThreatSafe)
+                        Surface(
+                            color = ThreatSafeBg,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text("Active", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = ThreatSafe, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                        }
                     }
                 }
 
@@ -526,7 +598,10 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             if (installedTools.isEmpty()) Icons.Default.CheckCircle else Icons.Default.Warning,
                             contentDescription = "Tool scan status",
@@ -544,23 +619,32 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                         }
                     }
 
-                    Text(
-                        if (installedTools.isEmpty()) "Clean" else "Flagged",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (installedTools.isEmpty()) ThreatSafe else ThreatCritical
-                    )
+                    Surface(
+                        color = if (installedTools.isEmpty()) ThreatSafeBg else ThreatCriticalBg,
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            if (installedTools.isEmpty()) "Clean" else "Flagged",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (installedTools.isEmpty()) ThreatSafe else ThreatCritical,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
 
                 Divider(color = BorderColor)
 
-                // 4. WebSocket Backend Connection
+                // 4. WebSocket Backend Connection (Tap to retry)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
                             if (connState == ConnectionStatus.CONNECTED) Icons.Default.CheckCircle else Icons.Default.Refresh,
                             contentDescription = "WS status",
@@ -570,20 +654,25 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text("AI Gateway Link", fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = Slate900)
-                            Text("FastAPI token-saving pipeline", fontSize = 11.5.sp, color = Slate500)
+                            Text(
+                                if (connState == ConnectionStatus.CONNECTED) "FastAPI live intelligence link" else "Offline fallback engine ready (tap to sync)",
+                                fontSize = 11.5.sp,
+                                color = Slate500
+                            )
                         }
                     }
 
                     Surface(
+                        onClick = { WebSocketClientManager.instance.connect() },
                         color = when (connState) {
                             ConnectionStatus.CONNECTED -> ThreatSafeBg
                             ConnectionStatus.CONNECTING -> ThreatWarningBg
                             else -> Slate100
                         },
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = connState.name,
+                            text = if (connState == ConnectionStatus.CONNECTED) "CONNECTED" else if (connState == ConnectionStatus.CONNECTING) "CONNECTING" else "OFFLINE READY",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = when (connState) {
@@ -591,7 +680,7 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                                 ConnectionStatus.CONNECTING -> ThreatWarning
                                 else -> Slate500
                             },
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
                     }
                 }

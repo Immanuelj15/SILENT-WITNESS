@@ -166,12 +166,12 @@ class LLMGateway:
             logger.info("OpenRouter key not configured or set to MOCK_DEV. Using MockLLMService.")
             return MockLLMService.evaluate(transcript, caller_metadata)
 
-        # Live OpenRouter evaluation with HTTPX
+        # Live OpenRouter evaluation with HTTPX (1.5s latency guardrail)
         try:
-            with httpx.Client(timeout=10.0) as client:
+            with httpx.Client(timeout=1.5) as client:
                 return cls._query_openrouter(client, transcript, caller_metadata)
         except Exception as e:
-            logger.error(f"OpenRouter query failed: {e}. Falling back to MockLLMService.")
+            logger.warning(f"OpenRouter query exceeded 1.5s latency or failed ({e}). Swiftly falling back to MockLLMService.")
             fallback = MockLLMService.evaluate(transcript, caller_metadata)
             fallback["fallback_reason"] = str(e)
             return fallback
@@ -179,16 +179,16 @@ class LLMGateway:
     @classmethod
     async def evaluate_dialogue_async(cls, transcript: str, caller_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Asynchronous evaluation routing for WebSockets and async routes.
+        Asynchronous evaluation routing for WebSockets and async routes with 1.5s latency safeguard.
         """
         if not cls.is_live_key_configured():
             return MockLLMService.evaluate(transcript, caller_metadata)
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=1.5) as client:
                 return await cls._query_openrouter_async(client, transcript, caller_metadata)
         except Exception as e:
-            logger.error(f"OpenRouter async query failed: {e}. Falling back to MockLLMService.")
+            logger.warning(f"OpenRouter async query exceeded 1.5s latency or failed ({e}). Swiftly falling back to MockLLMService.")
             fallback = MockLLMService.evaluate(transcript, caller_metadata)
             fallback["fallback_reason"] = str(e)
             return fallback

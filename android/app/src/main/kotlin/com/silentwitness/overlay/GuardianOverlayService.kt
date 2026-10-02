@@ -169,6 +169,17 @@ class GuardianOverlayService : Service() {
             }
             ACTION_START -> {
                 Log.i(TAG, "Guardian Overlay Service running in foreground")
+                if (!isOverlayVisible) {
+                    showOverlay(
+                        tier = ThreatTier.SAFE,
+                        bannerTitle = "🛡️ GUARDIAN SHIELD ACTIVE - MONITORING CALL",
+                        directives = listOf(
+                            "Silent Witness active over active call.",
+                            "Real-time AI scam detection running."
+                        ),
+                        riskScore = 5
+                    )
+                }
             }
         }
         return START_STICKY
@@ -635,7 +646,14 @@ class GuardianOverlayService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "Notice terminating call: ${e.message}")
         }
+        saveEvidenceToLedger()
         hideOverlay()
+
+        val navIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("EXTRA_NAVIGATE_TAB", "EVIDENCE")
+        }
+        startActivity(navIntent)
     }
 
     private fun saveEvidenceToLedger() {

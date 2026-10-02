@@ -91,6 +91,10 @@ async def run_live_call_loop(websocket: WebSocket, session_id: str):
                 continue
 
             msg_type = data.get("type", "TEXT_CHUNK")
+            if msg_type == "PING":
+                await websocket.send_json({"type": "PONG", "sessionId": session_id})
+                continue
+
             is_final = data.get("isFinal", False)
             caller_metadata = data.get("callerMetadata", {})
             chunk_index += 1
