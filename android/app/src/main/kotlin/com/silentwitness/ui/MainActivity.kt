@@ -6,8 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -179,10 +181,13 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
     val hasScreening by viewModel.hasCallScreeningRole.collectAsState()
     val installedTools by viewModel.installedRemoteTools.collectAsState()
     val connState by viewModel.connectionState.collectAsState()
+    val latestVerdict by viewModel.latestVerdict.collectAsState()
+    val scrollState = androidx.compose.foundation.rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
@@ -246,6 +251,195 @@ fun ShieldOverviewScreen(viewModel: GuardianViewModel) {
                         if (isArmed) "Deactivate Guardian Shield" else "Arm Guardian Shield",
                         fontWeight = FontWeight.Bold
                     )
+                }
+            }
+        }
+
+        // Feature 1, 2, 4, 5: Live Telephony Defense Monitor Card
+        if (latestVerdict != null) {
+            val verdict = latestVerdict!!
+            val rawRisk = verdict.riskScore.toFloat()
+            val animatedRisk by androidx.compose.animation.core.animateFloatAsState(
+                targetValue = rawRisk / 100f,
+                animationSpec = androidx.compose.animation.core.tween(durationMillis = 350),
+                label = "riskProgress"
+            )
+
+            val tierColor = when {
+                verdict.threatLevel == "CRITICAL" || rawRisk >= 80 -> ThreatCritical
+                verdict.threatLevel == "HIGH" || rawRisk >= 40 -> ThreatWarning
+                else -> ThreatSafe
+            }
+            val tierBg = when {
+                verdict.threatLevel == "CRITICAL" || rawRisk >= 80 -> ThreatCriticalBg
+                verdict.threatLevel == "HIGH" || rawRisk >= 40 -> ThreatWarningBg
+                else -> ThreatSafeBg
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, tierColor.copy(alpha = 0.6f)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "LIVE DEFENSE MONITOR",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Slate500
+                        )
+
+                        Surface(
+                            color = tierBg,
+                            shape = RoundedCornerShape(20.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, tierColor.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = verdict.threatLevel,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = tierColor
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = verdict.identifiedScamType,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Slate900
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Feature 5: Live Risk Percentage Gauge (0% - 100%)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "AI RISK GAUGE",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Slate500
+                        )
+                        Text(
+                            text = "${(animatedRisk * 100).toInt()}%",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = tierColor
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    LinearProgressIndicator(
+                        progress = { animatedRisk },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = tierColor,
+                        trackColor = Slate100
+                    )
+
+                    // Feature 2: Live Defense Warnings (Dynamic Coaching Directives)
+                    if (verdict.liveCoachingDirectives.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "DYNAMIC COACHING DIRECTIVES:",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = PrimaryBlue
+                        )
+                        Column(
+                            modifier = Modifier.padding(top = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            verdict.liveCoachingDirectives.forEach { directive ->
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Text("• ", fontWeight = FontWeight.Bold, color = tierColor)
+                                    Text(
+                                        text = directive,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Slate900
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Feature 4: Emergency Quick-Action Buttons
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                try {
+                                    val am = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
+                                    am?.let {
+                                        val newMute = !it.isMicrophoneMute
+                                        it.isMicrophoneMute = newMute
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            if (newMute) "Microphone Muted" else "Microphone Unmuted",
+                                            android.widget.Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                } catch (e: Exception) {
+                                    android.widget.Toast.makeText(context, "Mute: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Mute", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                try {
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                                        val telecom = context.getSystemService(android.content.Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                                        @Suppress("MissingPermission")
+                                        telecom?.endCall()
+                                    }
+                                    android.widget.Toast.makeText(context, "Call Terminated", android.widget.Toast.LENGTH_SHORT).show()
+                                } catch (e: Exception) {
+                                    android.widget.Toast.makeText(context, "End call notice", android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ThreatCritical),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Disconnect", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                viewModel.injectScamLabScenario(0, context)
+                                android.widget.Toast.makeText(context, "Evidence archived to ledger", android.widget.Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Slate900),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Save Proof", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
         }
