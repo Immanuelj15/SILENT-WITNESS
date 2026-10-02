@@ -33,10 +33,10 @@ fun ScamLabScreen(
     val latestVerdict by viewModel.latestVerdict.collectAsState()
 
     val testPresets = listOf(
-        "Digital Arrest Threat" to "This is Mumbai Police Cyber Crime Cell. A courier seized in your name contained narcotics. You are under immediate digital arrest.",
-        "Bank KYC OTP Scam" to "Hello sir, calling from SBI fraud security. Your debit card is blocked. Share the 6 digit OTP immediately to reactivate it.",
-        "AnyDesk Remote Access" to "Please download AnyDesk or TeamViewer from Play Store and read me the 9-digit code so I can fix your server error.",
-        "Legitimate Delivery" to "Hello, this is Blue Dart courier. I have an express document delivery for your address. Are you available to sign?"
+        "Digital Arrest Coercion" to "This is Mumbai Police Cyber Crime Cell. A narcotics consignment was intercepted under your Aadhaar. You are under immediate digital arrest and cannot disconnect.",
+        "Electricity Disconnection / Remote Screen Share" to "Your power will be cut tonight at 9:30 PM due to unpaid electricity bill. Download AnyDesk immediately and share the 9-digit OTP code to verify power meter.",
+        "Customs Seizure Consignment" to "This is International Customs Clearance. Your consignment parcel was seized containing illegal contraband. Pay Rs. 50,000 penalty clearance fee immediately.",
+        "Benign Routine Call" to "Hi, I am calling to confirm if the grocery delivery arrived safely at your apartment. Have a good afternoon."
     )
 
     LazyColumn(
@@ -186,7 +186,7 @@ fun ScamLabScreen(
 
                     Button(
                         onClick = {
-                            viewModel.sendScamLabSnippet(phrase)
+                            viewModel.injectScamLabScenario(index, context)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                         shape = RoundedCornerShape(8.dp),

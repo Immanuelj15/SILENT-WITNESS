@@ -14,8 +14,12 @@ class ScreenShareDetector(private val context: Context) {
     companion object {
         private const val TAG = "ScreenShareDetector"
 
+        const val ACTION_SCREEN_SHARE_DETECTED = "com.silentwitness.action.SCREEN_SHARE_DETECTED"
+        const val EXTRA_DETECTION_REASON = "extra_detection_reason"
+
         val SUSPICIOUS_PACKAGES = mapOf(
             "com.anydesk.anydeskandroid" to "AnyDesk Remote Control",
+            "com.teamviewer.host.market" to "TeamViewer Host",
             "com.teamviewer.teamviewer.market.mobile" to "TeamViewer QuickSupport",
             "com.teamviewer.quicksupport.market" to "TeamViewer",
             "com.rustdesk.rustdesk" to "RustDesk Remote Desktop",
@@ -44,8 +48,36 @@ class ScreenShareDetector(private val context: Context) {
         val riskLevel: String,
         val detectedTriggers: List<String>,
         val installedThreatPackages: List<String>,
-        val warningMessage: String?
+        val warningMessage: String?,
+        val isScreenCaptureActive: Boolean = false
     )
+
+    fun isScreenCaptureActive(): Boolean {
+        return try {
+            val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager
+            val displays = displayManager?.displays ?: return false
+            // Check for presentation or virtual displays created by screen recording/mirroring
+            displays.any { display ->
+                display.displayId != android.view.Display.DEFAULT_DISPLAY
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice checking display capture state: ${e.message}")
+            false
+        }
+    }
+
+    fun broadcastScreenShareAlert(reason: String) {
+        try {
+            val intent = android.content.Intent(ACTION_SCREEN_SHARE_DETECTED).apply {
+                putExtra(EXTRA_DETECTION_REASON, reason)
+                setPackage(context.packageName)
+            }
+            context.sendBroadcast(intent)
+            Log.w(TAG, "Dispatched ACTION_SCREEN_SHARE_DETECTED broadcast: $reason")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to broadcast screen share alert: ${e.message}")
+        }
+    }
 
     fun checkInstalledRemoteTools(): List<String> {
         val pm = context.packageManager
@@ -67,11 +99,14 @@ class ScreenShareDetector(private val context: Context) {
         val lower = snippet.lowercase()
         val matchedTriggers = DANGEROUS_TRIGGERS.filter { lower.contains(it) }
         val installedTools = checkInstalledRemoteTools()
+        val screenCaptureActive = isScreenCaptureActive()
 
-        val isThreat = matchedTriggers.isNotEmpty() || (installedTools.isNotEmpty() && lower.contains("open"))
+        val isThreat = screenCaptureActive || matchedTriggers.isNotEmpty() || (installedTools.isNotEmpty() && (lower.contains("open") || lower.contains("download")))
 
         if (isThreat) {
             val warning = when {
+                screenCaptureActive ->
+                    "CRITICAL: Unauthorized screen-share or display mirroring session is active! Scammers can view your screen."
                 matchedTriggers.contains("anydesk") || matchedTriggers.contains("teamviewer") ->
                     "CRITICAL: Caller requested Remote Desktop software. NEVER install or launch AnyDesk/TeamViewer!"
                 matchedTriggers.contains("share screen") || matchedTriggers.contains("start sharing") ->
@@ -82,12 +117,15 @@ class ScreenShareDetector(private val context: Context) {
                     "SUSPECTED SCREEN SHARING COERCION DETECTED."
             }
 
+            broadcastScreenShareAlert(warning)
+
             return DetectionResult(
                 isCoercionDetected = true,
                 riskLevel = "CRITICAL",
                 detectedTriggers = matchedTriggers,
                 installedThreatPackages = installedTools,
-                warningMessage = warning
+                warningMessage = warning,
+                isScreenCaptureActive = screenCaptureActive
             )
         }
 
@@ -96,7 +134,8 @@ class ScreenShareDetector(private val context: Context) {
             riskLevel = "SAFE",
             detectedTriggers = emptyList(),
             installedThreatPackages = installedTools,
-            warningMessage = null
+            warningMessage = null,
+            isScreenCaptureActive = false
         )
     }
 }

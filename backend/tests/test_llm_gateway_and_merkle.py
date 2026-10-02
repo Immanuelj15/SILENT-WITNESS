@@ -31,8 +31,26 @@ def test_mock_llm_benign():
     assert result["threat_level"] == "SAFE"
     assert result["composite_risk"] <= 0.10
 
+def test_mock_llm_customs_seizure():
+    transcript = "This is Customs clearance department. Your international consignment has been seized for narcotics. Pay the 50000 clearance fee penalty immediately."
+    result = MockLLMService.evaluate(transcript)
+    assert result["threat_level"] == "CRITICAL"
+    assert result["composite_risk"] >= 0.90
+    assert "Customs" in result["identified_scam_type"]
+
+def test_mock_llm_electricity_disconnection():
+    transcript = "Your electricity power will be cut tonight at 9:30 PM due to unpaid electricity bill. Download AnyDesk and share the OTP to update power meter."
+    result = MockLLMService.evaluate(transcript)
+    assert result["threat_level"] == "CRITICAL"
+    assert result["composite_risk"] >= 0.90
+    assert "Electricity" in result["identified_scam_type"]
+
 def test_pii_masking():
-    raw_text = "My card number is 4111 2222 3333 4444, cvv is 321, expiry 05/28, and my otp is 987654 for account 123456789012."
+    raw_text = (
+        "My card number is 4111 2222 3333 4444, cvv is 321, expiry 05/28, "
+        "and my otp is 987654 for account 123456789012. "
+        "My Aadhaar is 1234 5678 9012 and PAN card is ABCDE1234F, SSN 123-45-6789."
+    )
     masked = mask_pii(raw_text)
     assert "4111 2222 3333 4444" not in masked
     assert "[CARD_REDACTED]" in masked
@@ -44,6 +62,12 @@ def test_pii_masking():
     assert "[OTP_REDACTED]" in masked
     assert "123456789012" not in masked
     assert "[ACCOUNT_REDACTED]" in masked
+    assert "1234 5678 9012" not in masked
+    assert "[AADHAAR_REDACTED]" in masked
+    assert "ABCDE1234F" not in masked
+    assert "[PAN_REDACTED]" in masked
+    assert "123-45-6789" not in masked
+    assert "[SSN_REDACTED]" in masked
 
 def test_merkle_audit_ledger_chaining():
     session_id = "test-merkle-session"

@@ -47,6 +47,15 @@ def mask_pii(text: str) -> str:
     # 6. Card Expiry Dates (MM/YY or MM/YYYY)
     masked = re.sub(r'\b(0[1-9]|1[0-2])\/([2-3][0-9])\b', '[EXPIRY_REDACTED]', masked)
 
+    # 7. Indian Aadhaar Numbers (12 digits with optional spaces: XXXX XXXX XXXX)
+    masked = re.sub(r'\b\d{4}\s?\d{4}\s?\d{4}\b', '[AADHAAR_REDACTED]', masked)
+
+    # 8. Indian PAN Card Numbers (5 letters, 4 digits, 1 letter: ABCDE1234F)
+    masked = re.sub(r'\b[A-Z]{5}[0-9]{4}[A-Z]\b', '[PAN_REDACTED]', masked)
+
+    # 9. Government Social Security Numbers (3-2-4 digits)
+    masked = re.sub(r'\b\d{3}-\d{2}-\d{4}\b', '[SSN_REDACTED]', masked)
+
     return masked
 
 
@@ -151,6 +160,14 @@ async def run_live_call_loop(websocket: WebSocket, session_id: str):
             effective_trust_score = max(0, 100 - effective_risk_score)
             effective_classification = threat_level if threat_level in ["CRITICAL", "HIGH"] else analysis.classification
 
+            # Compute deepfake metric and screen-sharing indicators
+            deepfake_metric = round(voice_res.confidence if (voice_res and voice_res.is_synthetic_suspected) else (voice_res.voiceRisk / 100.0 if voice_res else 0.0), 2)
+            has_screen_share = bool(
+                data.get("screen_share_active", False) or
+                data.get("screen_share_detected", False) or
+                (effective_risk_score >= 80 and "screen" in accumulated_transcript.lower() and ("share" in accumulated_transcript.lower() or "anydesk" in accumulated_transcript.lower() or "teamviewer" in accumulated_transcript.lower()))
+            )
+
             # 6. Structured Payload meeting exact Native Android & Web contracts
             response_payload = {
                 "type": "STREAM_UPDATE",
@@ -159,6 +176,8 @@ async def run_live_call_loop(websocket: WebSocket, session_id: str):
                 "composite_risk": composite_risk,
                 "identified_scam_type": identified_scam_type,
                 "live_coaching_directives": live_coaching,
+                "deepfake_confidence": deepfake_metric,
+                "screen_share_risk": has_screen_share,
                 "audit_hash": audit_block.audit_hash,
                 "block_index": audit_block.block_index,
                 "timestamp": audit_block.timestamp,

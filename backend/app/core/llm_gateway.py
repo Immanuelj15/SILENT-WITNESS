@@ -19,10 +19,49 @@ class MockLLMService:
     def evaluate(cls, transcript: str, caller_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         text_lower = (transcript or "").lower()
 
-        # 1. Digital Arrest / Police / CBI Impersonation
+        # 1. Customs Seizure Consignment Extortion
+        customs_triggers = [
+            "customs", "consignment", "parcel seized", "clearance fee", "penalty clearance",
+            "illegal parcel", "narcotics found", "customs clearance", "dhl parcel", "fedex parcel"
+        ]
+        if any(term in text_lower for term in customs_triggers) and any(term in text_lower for term in ["fee", "penalty", "clearance", "money", "pay", "charges", "transfer", "tax", "seized"]):
+            return {
+                "threat_level": "CRITICAL",
+                "composite_risk": 0.93,
+                "identified_scam_type": "Customs Seizure Consignment Extortion",
+                "live_coaching_directives": [
+                    "CRITICAL: Customs departments NEVER demand penalty clearance fees over phone calls.",
+                    "Do NOT transfer money to personal bank accounts or UPI IDs for customs clearance.",
+                    "Legitimate customs notices are served via official government postal mail.",
+                    "Disconnect immediately and report to Cyber Crime Helpline 1930."
+                ],
+                "explanation": "Extortion attempt falsely alleging illegal consignment seizure and demanding immediate clearance fee payment.",
+                "is_mock": True,
+                "provider": "MockLLMService"
+            }
+
+        # 2. Electricity Disconnection / Remote Screen Share
+        electricity_triggers = ["electricity", "power disconnection", "power will be cut", "electricity bill", "bill unpaid", "light cut"]
+        if any(term in text_lower for term in electricity_triggers):
+            return {
+                "threat_level": "CRITICAL",
+                "composite_risk": 0.92,
+                "identified_scam_type": "Electricity Disconnection / Remote Screen Share",
+                "live_coaching_directives": [
+                    "CRITICAL: Electricity boards do NOT disconnect power without prior written notice.",
+                    "NEVER download AnyDesk, QuickSupport, or share OTP to update electricity bills.",
+                    "Pay utility bills ONLY through official state electricity portals or apps.",
+                    "Disconnect call immediately."
+                ],
+                "explanation": "Urgent extortion claiming immediate power disconnection to coerce remote desktop installation and OTP disclosure.",
+                "is_mock": True,
+                "provider": "MockLLMService"
+            }
+
+        # 3. Digital Arrest / Police / CBI Impersonation
         digital_arrest_triggers = [
             "digital arrest", "mumbai police", "cyber crime", "cbi", "ed officer",
-            "narcotics", "customs", "arrest warrant", "illegal parcel", "passport seized",
+            "narcotics", "arrest warrant", "illegal parcel", "passport seized",
             "drugs found", "cannot hang up", "stay on video", "supreme court order"
         ]
         if any(term in text_lower for term in digital_arrest_triggers):
@@ -41,7 +80,7 @@ class MockLLMService:
                 "provider": "MockLLMService"
             }
 
-        # 2. Remote Access Coercion (AnyDesk, TeamViewer, RustDesk, QuickSupport)
+        # 4. Remote Access Coercion (AnyDesk, TeamViewer, RustDesk, QuickSupport)
         remote_access_triggers = [
             "anydesk", "teamviewer", "rustdesk", "quicksupport", "screen share",
             "share screen", "share your screen", "start sharing", "open anydesk",
@@ -63,11 +102,10 @@ class MockLLMService:
                 "provider": "MockLLMService"
             }
 
-        # 3. Financial OTP / KYC Expiration Scams
+        # 5. Financial OTP / KYC Expiration Scams
         financial_otp_triggers = [
             "otp", "one time password", "kyc", "account blocked", "account will be blocked",
-            "pan card expired", "electricity bill", "power disconnected", "share otp",
-            "verify otp", "cvv", "card expiry", "sbi kyc", "sim block"
+            "pan card expired", "share otp", "verify otp", "cvv", "card expiry", "sbi kyc", "sim block"
         ]
         if any(term in text_lower for term in financial_otp_triggers):
             return {
@@ -85,7 +123,7 @@ class MockLLMService:
                 "provider": "MockLLMService"
             }
 
-        # 4. Routine / Benign Calls (Baseline 0.05)
+        # 6. Routine / Benign Calls (Baseline 0.05)
         return {
             "threat_level": "SAFE",
             "composite_risk": 0.05,

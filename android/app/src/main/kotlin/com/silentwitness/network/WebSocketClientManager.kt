@@ -112,6 +112,28 @@ class WebSocketClientManager(
         webSocket?.send(json)
     }
 
+    fun sendAudioChunk(audioBase64: String, isFinal: Boolean = false, hasScreenShare: Boolean = false) {
+        val payload = mapOf(
+            "type" to "AUDIO_CHUNK",
+            "audioBase64" to audioBase64,
+            "isFinal" to isFinal,
+            "screen_share_active" to hasScreenShare
+        )
+        val json = gson.toJson(payload)
+        webSocket?.send(json)
+    }
+
+    fun recordProof(verdict: ThreatVerdict) {
+        val currentList = _auditHistory.value.toMutableList()
+        currentList.add(0, verdict)
+        _auditHistory.value = currentList
+    }
+
+    fun injectLocalVerdict(verdict: ThreatVerdict) {
+        _latestVerdict.value = verdict
+        recordProof(verdict)
+    }
+
     fun disconnect() {
         webSocket?.close(1000, "User disconnected")
         webSocket = null

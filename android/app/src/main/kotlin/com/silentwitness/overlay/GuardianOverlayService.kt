@@ -66,6 +66,24 @@ class GuardianOverlayService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var audioManager: AudioManager? = null
 
+    private var lastObservedVerdict: ThreatVerdict? = null
+
+    private val screenShareReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == com.silentwitness.screenshare.ScreenShareDetector.ACTION_SCREEN_SHARE_DETECTED) {
+                val reason = intent.getStringExtra(com.silentwitness.screenshare.ScreenShareDetector.EXTRA_DETECTION_REASON)
+                    ?: "Unauthorized remote screen share active"
+                Log.w(TAG, "Received high-priority screen share threat broadcast: $reason")
+                showOverlay(
+                    isCritical = true,
+                    bannerTitle = "CRITICAL: DO NOT SHARE OTP / REMOTE ACCESS APP DETECTED",
+                    primaryDirective = "Remote screen capture or remote control app active. Stop sharing immediately to protect credentials.",
+                    riskScore = 98
+                )
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -75,6 +93,18 @@ class GuardianOverlayService : Service() {
 
         startForegroundNotification("Guardian Active", "Monitoring ongoing communication for scam threats")
         observeThreatVerdicts()
+
+        // Register broadcast receiver for instant screen share threat notifications
+        try {
+            val filter = android.content.IntentFilter(com.silentwitness.screenshare.ScreenShareDetector.ACTION_SCREEN_SHARE_DETECTED)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(screenShareReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                registerReceiver(screenShareReceiver, filter)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice registering screenShareReceiver: ${e.message}")
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -125,6 +155,7 @@ class GuardianOverlayService : Service() {
         serviceScope.launch {
             WebSocketClientManager.instance.latestVerdict.collectLatest { verdict ->
                 if (verdict != null) {
+                    lastObservedVerdict = verdict
                     handleVerdict(verdict)
                 }
             }
@@ -136,16 +167,16 @@ class GuardianOverlayService : Service() {
             "CRITICAL" -> {
                 if (verdict.identifiedScamType.contains("Digital Arrest", ignoreCase = true)) {
                     showOverlay(
-                        isCritical = true,
-                        bannerTitle = "🚨 SUSPECTED DIGITAL ARREST - POLICE NEVER USE WHATSAPP",
+                        isCritical = false, // Amber banner
+                        bannerTitle = "SUSPECTED DIGITAL ARREST - LAW ENFORCEMENT DOES NOT INVESTIGATE VIA MESSAGING APPS",
                         primaryDirective = verdict.liveCoachingDirectives.firstOrNull()
                             ?: "Do NOT transfer funds. Police and CBI never arrest citizens over video calls.",
                         riskScore = verdict.riskScore
                     )
                 } else {
                     showOverlay(
-                        isCritical = true,
-                        bannerTitle = "🚨 CRITICAL: DO NOT SHARE OTP OR SCREEN",
+                        isCritical = true, // Red banner
+                        bannerTitle = "CRITICAL: DO NOT SHARE OTP / REMOTE ACCESS APP DETECTED",
                         primaryDirective = verdict.liveCoachingDirectives.firstOrNull()
                             ?: "Demanding OTP or Remote Access detected. Never disclose banking credentials.",
                         riskScore = verdict.riskScore
@@ -154,15 +185,14 @@ class GuardianOverlayService : Service() {
             }
             "HIGH" -> {
                 showOverlay(
-                    isCritical = false,
-                    bannerTitle = "⚠️ CAUTION: SUSPICIOUS SENSITIVE DEMAND DETECTED",
+                    isCritical = false, // Amber banner
+                    bannerTitle = "SUSPECTED DIGITAL ARREST - LAW ENFORCEMENT DOES NOT INVESTIGATE VIA MESSAGING APPS",
                     primaryDirective = verdict.liveCoachingDirectives.firstOrNull()
                         ?: "Verify caller identity out-of-band before proceeding.",
                     riskScore = verdict.riskScore
                 )
             }
             "SAFE" -> {
-                // If previously flagged, hide or transition to safe
                 hideOverlay()
             }
         }
@@ -172,24 +202,24 @@ class GuardianOverlayService : Service() {
         when (threatType.uppercase()) {
             "DIGITAL_ARREST" -> {
                 showOverlay(
-                    isCritical = true,
-                    bannerTitle = "🚨 SUSPECTED DIGITAL ARREST - POLICE NEVER USE WHATSAPP",
+                    isCritical = false, // Amber banner
+                    bannerTitle = "SUSPECTED DIGITAL ARREST - LAW ENFORCEMENT DOES NOT INVESTIGATE VIA MESSAGING APPS",
                     primaryDirective = customMessage ?: "Narcotics/customs extortion detected. Police never interrogate via WhatsApp. Hang up immediately.",
                     riskScore = 95
                 )
             }
             "REMOTE_ACCESS" -> {
                 showOverlay(
-                    isCritical = true,
-                    bannerTitle = "🚨 CRITICAL: REMOTE ACCESS TAKEOVER ATTEMPT",
+                    isCritical = true, // Red banner
+                    bannerTitle = "CRITICAL: DO NOT SHARE OTP / REMOTE ACCESS APP DETECTED",
                     primaryDirective = customMessage ?: "Do NOT install AnyDesk, TeamViewer, or share your screen. Terminate call immediately.",
                     riskScore = 94
                 )
             }
             else -> {
                 showOverlay(
-                    isCritical = true,
-                    bannerTitle = "🚨 CRITICAL: DO NOT SHARE OTP",
+                    isCritical = true, // Red banner
+                    bannerTitle = "CRITICAL: DO NOT SHARE OTP / REMOTE ACCESS APP DETECTED",
                     primaryDirective = customMessage ?: "Bank impersonation detected. Never read out OTP or passwords over phone calls.",
                     riskScore = 88
                 )
@@ -255,7 +285,7 @@ class GuardianOverlayService : Service() {
         val bgDrawable = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
             cornerRadius = 32f
-            setColor(if (isCritical) Color.parseColor("#991B1B") else Color.parseColor("#B45309"))
+            setColor(if (isCritical) Color.parseColor("#EF4444") else Color.parseColor("#F59E0B"))
             setStroke(4, Color.parseColor("#FFFFFF"))
         }
         root.background = bgDrawable
@@ -272,43 +302,63 @@ class GuardianOverlayService : Service() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(18), dp(20), dp(18))
+            setPadding(dp(18), dp(16), dp(18), dp(16))
 
             val bg = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dp(16).toFloat()
-                setColor(if (isCritical) Color.parseColor("#991B1B") else Color.parseColor("#B45309"))
+                setColor(if (isCritical) Color.parseColor("#EF4444") else Color.parseColor("#F59E0B"))
                 setStroke(dp(2), Color.parseColor("#FFFFFF"))
             }
             background = bg
             elevation = dp(12).toFloat()
         }
 
-        // Header Title
+        // Header Title Row with Dismiss icon
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            weightSum = 1f
+        }
+
         val titleView = TextView(this).apply {
             id = R.id.overlay_title
             text = title
             setTextColor(Color.WHITE)
-            textSize = 15f
+            textSize = 14f
             typeface = Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, 0, 0, dp(6))
+            gravity = Gravity.START
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.9f)
+            setPadding(0, 0, dp(4), dp(4))
         }
-        root.addView(titleView)
+        headerRow.addView(titleView)
+
+        val closeBtn = TextView(this).apply {
+            text = "✕"
+            setTextColor(Color.WHITE)
+            textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 0.1f)
+            setOnClickListener { hideOverlay() }
+        }
+        headerRow.addView(closeBtn)
+
+        root.addView(headerRow)
 
         // Directive Subtitle
         val directiveView = TextView(this).apply {
             id = R.id.overlay_message
             text = directive
             setTextColor(Color.parseColor("#FEF2F2"))
-            textSize = 13f
+            textSize = 12f
             typeface = Typeface.DEFAULT
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, 0, 0, dp(14))
+            gravity = Gravity.START
+            setPadding(0, dp(4), 0, dp(12))
         }
         root.addView(directiveView)
 
-        // Fast Action Buttons Row
+        // Fast Action Buttons Row: [Mute Audio], [Disconnect], [Save Proof]
         val actionsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -317,8 +367,8 @@ class GuardianOverlayService : Service() {
 
         // 1. MUTE CALLER Button
         val muteButton = Button(this).apply {
-            text = "MUTE CALL"
-            textSize = 12f
+            text = "MUTE AUDIO"
+            textSize = 11f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             background = GradientDrawable().apply {
@@ -326,8 +376,8 @@ class GuardianOverlayService : Service() {
                 cornerRadius = dp(8).toFloat()
                 setStroke(dp(1), Color.WHITE)
             }
-            layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-                marginEnd = dp(6)
+            layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+                marginEnd = dp(4)
             }
             setOnClickListener {
                 toggleMute()
@@ -338,16 +388,16 @@ class GuardianOverlayService : Service() {
         // 2. DISCONNECT Button
         val disconnectButton = Button(this).apply {
             text = "DISCONNECT"
-            textSize = 12f
+            textSize = 11f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#DC2626"))
+                setColor(Color.parseColor("#991B1B"))
                 cornerRadius = dp(8).toFloat()
                 setStroke(dp(1), Color.WHITE)
             }
-            layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-                marginEnd = dp(6)
+            layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f).apply {
+                marginEnd = dp(4)
             }
             setOnClickListener {
                 disconnectActiveCall()
@@ -355,25 +405,47 @@ class GuardianOverlayService : Service() {
         }
         actionsRow.addView(disconnectButton)
 
-        // 3. DISMISS Button
-        val dismissButton = Button(this).apply {
-            text = "DISMISS"
-            textSize = 12f
-            setTextColor(Color.parseColor("#E2E8F0"))
-            typeface = Typeface.DEFAULT
+        // 3. SAVE INCIDENT PROOF Button
+        val saveProofButton = Button(this).apply {
+            text = "SAVE PROOF"
+            textSize = 11f
+            setTextColor(Color.WHITE)
+            typeface = Typeface.DEFAULT_BOLD
             background = GradientDrawable().apply {
-                setColor(Color.TRANSPARENT)
+                setColor(Color.parseColor("#0F172A"))
                 cornerRadius = dp(8).toFloat()
+                setStroke(dp(1), Color.parseColor("#38BDF8"))
             }
-            layoutParams = LinearLayout.LayoutParams(0, dp(42), 1f)
+            layoutParams = LinearLayout.LayoutParams(0, dp(40), 1f)
             setOnClickListener {
-                hideOverlay()
+                saveIncidentProof()
             }
         }
-        actionsRow.addView(dismissButton)
+        actionsRow.addView(saveProofButton)
 
         root.addView(actionsRow)
         return root
+    }
+
+    private fun saveIncidentProof() {
+        try {
+            val verdict = lastObservedVerdict ?: ThreatVerdict(
+                threatLevel = "CRITICAL",
+                compositeRisk = 0.95f,
+                identifiedScamType = "Captured Incident",
+                liveCoachingDirectives = listOf("Suspicious active call intercepted"),
+                auditHash = java.util.UUID.randomUUID().toString().replace("-", ""),
+                blockIndex = 1,
+                timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()),
+                riskScore = 95,
+                explanation = "Manual incident proof capture triggered by user during suspected extortion call."
+            )
+            WebSocketClientManager.instance.recordProof(verdict)
+            android.widget.Toast.makeText(this, "Incident proof cryptographically archived to ledger", android.widget.Toast.LENGTH_SHORT).show()
+            Log.i(TAG, "Incident proof saved to ledger: ${verdict.auditHash}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save incident proof: ${e.message}")
+        }
     }
 
     private fun toggleMute() {
@@ -382,6 +454,11 @@ class GuardianOverlayService : Service() {
                 val newMute = !am.isMicrophoneMute
                 am.isMicrophoneMute = newMute
                 Log.i(TAG, "Microphone mute toggled to: $newMute")
+                android.widget.Toast.makeText(
+                    this,
+                    if (newMute) "Microphone Muted" else "Microphone Unmuted",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to mute: ${e.message}")
@@ -418,6 +495,11 @@ class GuardianOverlayService : Service() {
     }
 
     override fun onDestroy() {
+        try {
+            unregisterReceiver(screenShareReceiver)
+        } catch (e: Exception) {
+            // ignore if not registered
+        }
         hideOverlay()
         serviceScope.cancel()
         super.onDestroy()

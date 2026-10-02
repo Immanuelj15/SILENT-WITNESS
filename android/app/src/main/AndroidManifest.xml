@@ -23,6 +23,7 @@
 
     <!-- Companion Audio Processing -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <application
         android:name=".SilentWitnessApp"
@@ -54,6 +55,13 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Real-time scam alert overlay during phone calls" />
         </service>
+
+        <!-- OTT Audio Stream Capture Foreground Service -->
+        <service
+            android:name=".audio.OttAudioCaptureService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <activity
             android:name=".ui.MainActivity"

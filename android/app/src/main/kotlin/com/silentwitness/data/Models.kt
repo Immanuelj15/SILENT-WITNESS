@@ -33,6 +33,12 @@ data class ThreatVerdict(
     @SerializedName("riskScore")
     val riskScore: Int = 5,
 
+    @SerializedName("deepfake_confidence")
+    val deepfakeConfidence: Float = 0.0f,
+
+    @SerializedName("screen_share_risk")
+    val screenShareRisk: Boolean = false,
+
     @SerializedName("explanation")
     val explanation: String = ""
 )

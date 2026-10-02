@@ -19,14 +19,14 @@ class SocialEngineeringAgent:
     PATTERNS = [
         ("URGENCY", r"\b(immediately|right now|urgently|at once|without delay|hurry)\b", "HIGH"),
         ("TIME_LIMITATION", r"\b(within (\d+|few) (minutes|hours)|today itself|offer expires|deadline)\b", "HIGH"),
-        ("AUTHORITY", r"\b(calling from your bank|police department|cbi officer|customs clearance|rbi official|crime branch)\b", "HIGH"),
+        ("AUTHORITY", r"\b(calling from your bank|police department|cbi officer|customs clearance|rbi official|crime branch|cyber crime|narcotics bureau|ed officer)\b", "HIGH"),
         ("FEAR", r"\b(account (will be|has been) (blocked|suspended|frozen|closed)|arrested|warrant issued|penalized)\b", "CRITICAL"),
         ("THREAT", r"\b(legal action|police will be sent|fir will be registered|property seized|digital arrest)\b", "CRITICAL"),
         ("REWARD", r"\b(congratulations|lottery won|lucky draw prize|cashback approved|exclusive reward)\b", "MEDIUM"),
         ("SCARCITY", r"\b(only (\d+) slots left|last chance|offer valid for today only)\b", "MEDIUM"),
         ("IMPERSONATION", r"\b(this is inspector|i am your manager|i am your son|this is customer support)\b", "HIGH"),
         ("EMOTIONAL_MANIPULATION", r"\b(mom i am in trouble|please help me|i had an accident|do you not trust me)\b", "HIGH"),
-        ("ISOLATION", r"\b(do not hang up|stay on the line|do not tell anyone|keep this confidential|private inquiry)\b", "CRITICAL"),
+        ("ISOLATION", r"\b(do not hang up|stay on the line|do not tell anyone|keep this confidential|private inquiry|stay in the room alone|go to a private room|lock your room)\b", "CRITICAL"),
         ("SECRECY", r"\b(do not share this with bank staff|keep it secret|do not discuss with family)\b", "CRITICAL"),
         ("PRESSURE", r"\b(why are you waiting|do it now|if you don't comply|you will be held responsible)\b", "HIGH")
     ]

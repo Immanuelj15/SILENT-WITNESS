@@ -89,7 +89,7 @@ class GuardianViewModel : ViewModel() {
         }
     }
 
-    fun sendScamLabSnippet(text: String) {
+    fun sendScamLabSnippet(text: String, context: Context? = null) {
         viewModelScope.launch {
             if (wsManager.connectionState.value != ConnectionStatus.CONNECTED) {
                 wsManager.connect()
@@ -98,12 +98,118 @@ class GuardianViewModel : ViewModel() {
         }
     }
 
+    fun injectScamLabScenario(scenarioIndex: Int, context: Context) {
+        viewModelScope.launch {
+            val (scenarioName, script, threatLevel, riskScore, scamType, directives, bannerType) = when (scenarioIndex) {
+                0 -> Tuple7(
+                    "Digital Arrest Coercion",
+                    "This is Mumbai Police Cyber Crime Cell. A narcotics consignment was intercepted under your Aadhaar. You are under immediate digital arrest and cannot disconnect.",
+                    "CRITICAL",
+                    96,
+                    "Digital Arrest / Law Enforcement Extortion",
+                    listOf(
+                        "DO NOT TRANSFER CLEARANCE FEES",
+                        "POLICE NEVER ISSUE ARRESTS OVER VIDEO CALLS",
+                        "Digital arrest is legally non-existent. Hang up immediately."
+                    ),
+                    "DIGITAL_ARREST"
+                )
+                1 -> Tuple7(
+                    "Electricity Disconnection / Remote Screen Share",
+                    "Your power will be cut tonight at 9:30 PM due to unpaid electricity bill. Download AnyDesk immediately and share the 9-digit OTP code to verify power meter.",
+                    "CRITICAL",
+                    94,
+                    "Electricity Disconnection / Remote Screen Share",
+                    listOf(
+                        "NEVER DOWNLOAD ANYDESK OR TEAMVIEWER",
+                        "DO NOT SHARE OTP OR SCREEN ACCESS",
+                        "Utility boards do not demand remote desktop apps to pay bills."
+                    ),
+                    "REMOTE_ACCESS"
+                )
+                2 -> Tuple7(
+                    "Customs Seizure Consignment",
+                    "This is International Customs Clearance. Your consignment parcel was seized containing illegal contraband. Pay Rs. 50,000 penalty clearance fee immediately.",
+                    "CRITICAL",
+                    93,
+                    "Customs Seizure Consignment Extortion",
+                    listOf(
+                        "DO NOT TRANSFER CLEARANCE FEES",
+                        "Customs notices are NEVER served via phone calls",
+                        "Report extortion attempt to National Cyber Helpline 1930"
+                    ),
+                    "REMOTE_ACCESS"
+                )
+                else -> Tuple7(
+                    "Benign Routine Call",
+                    "Hi, I am calling to confirm if the grocery delivery arrived safely at your apartment. Have a good afternoon.",
+                    "SAFE",
+                    5,
+                    "Benign Routine Call",
+                    listOf(
+                        "Standard conversational baseline observed",
+                        "Maintain regular personal credential awareness"
+                    ),
+                    "SAFE"
+                )
+            }
+
+            // Cryptographic SHA-256 audit hash generation
+            val auditHash = java.security.MessageDigest.getInstance("SHA-256")
+                .digest("$scenarioName:$riskScore:${System.currentTimeMillis()}".toByteArray())
+                .joinToString("") { "%02x".format(it) }
+
+            val timeStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+
+            val verdict = ThreatVerdict(
+                threatLevel = threatLevel,
+                compositeRisk = riskScore / 100.0f,
+                identifiedScamType = scamType,
+                liveCoachingDirectives = directives,
+                auditHash = auditHash,
+                blockIndex = wsManager.auditHistory.value.size + 1,
+                timestamp = timeStr,
+                maskedTranscript = script,
+                trustScore = 100 - riskScore,
+                riskScore = riskScore,
+                deepfakeConfidence = if (scenarioIndex == 0) 0.89f else 0.05f,
+                screenShareRisk = (scenarioIndex == 1),
+                explanation = "Scam Lab Sandbox: Injected simulated scenario for $scenarioName."
+            )
+
+            // 1. Immediately drive the live risk gauge and audit history
+            wsManager.injectLocalVerdict(verdict)
+
+            // 2. Also send over WebSocket if connected
+            if (wsManager.connectionState.value == ConnectionStatus.CONNECTED) {
+                wsManager.sendSpeechSnippet(script, isFinal = false)
+            }
+
+            // 3. Immediately drive floating overlay
+            if (Settings.canDrawOverlays(context)) {
+                if (threatLevel == "SAFE") {
+                    GuardianOverlayService.stopService(context)
+                } else {
+                    simulateOverlay(context, bannerType)
+                }
+            }
+        }
+    }
+
+    private data class Tuple7<A, B, C, D, E, F, G>(
+        val a: A, val b: B, val c: C, val d: D, val e: E, val f: F, val g: G
+    )
+
     fun simulateOverlay(context: Context, threatType: String) {
         val intent = Intent(context, GuardianOverlayService::class.java).apply {
             action = GuardianOverlayService.ACTION_SIMULATE_ALERT
             putExtra(GuardianOverlayService.EXTRA_THREAT_TYPE, threatType)
         }
-        context.startService(intent)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent)
+        } else {
+            context.startService(intent)
+        }
     }
 
     fun clearAuditHistory() {
