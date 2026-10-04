@@ -93,9 +93,13 @@ class CallScreeningServiceImpl : CallScreeningService() {
             }
         }
 
-        // 3. Arm Guardian Protection Overlay for the active call
+        // 3. Arm Guardian Protection Overlay for the active cellular call
         try {
-            GuardianOverlayService.startService(applicationContext)
+            GuardianOverlayService.startService(
+                context = applicationContext,
+                callerNumber = rawNumber,
+                callType = "Cellular Inbound"
+            )
             WebSocketClientManager.instance.connect()
             // 4. Pipe incoming audio stream frames through Voice Activity Detection (VAD)
             CallAudioStreamer.startStreaming(applicationContext)

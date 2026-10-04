@@ -31,6 +31,9 @@ class GuardianViewModel : ViewModel() {
     private val _hasCallScreeningRole = MutableStateFlow(false)
     val hasCallScreeningRole: StateFlow<Boolean> = _hasCallScreeningRole.asStateFlow()
 
+    private val _hasAccessibilityPermission = MutableStateFlow(false)
+    val hasAccessibilityPermission: StateFlow<Boolean> = _hasAccessibilityPermission.asStateFlow()
+
     private val _installedRemoteTools = MutableStateFlow<List<String>>(emptyList())
     val installedRemoteTools: StateFlow<List<String>> = _installedRemoteTools.asStateFlow()
 
@@ -48,8 +51,40 @@ class GuardianViewModel : ViewModel() {
             _hasCallScreeningRole.value = true
         }
 
+        _hasAccessibilityPermission.value = isAccessibilityServiceEnabled(context)
+
         val detector = ScreenShareDetector(context)
         _installedRemoteTools.value = detector.checkInstalledRemoteTools()
+    }
+
+    fun requestAccessibilityPermission(context: Context) {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    }
+
+    private fun isAccessibilityServiceEnabled(context: Context): Boolean {
+        return try {
+            val expectedComponent = android.content.ComponentName(context, com.silentwitness.accessibility.CallAccessibilityService::class.java).flattenToString()
+            val enabledServices = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: return false
+            val colonSplitter = android.text.TextUtils.SimpleStringSplitter(':')
+            colonSplitter.setString(enabledServices)
+            while (colonSplitter.hasNext()) {
+                val component = colonSplitter.next()
+                if (component.equals(expectedComponent, ignoreCase = true) ||
+                    component.contains(context.packageName, ignoreCase = true)
+                ) {
+                    return true
+                }
+            }
+            false
+        } catch (e: Exception) {
+            false
+        }
     }
 
     fun toggleShield(context: Context) {

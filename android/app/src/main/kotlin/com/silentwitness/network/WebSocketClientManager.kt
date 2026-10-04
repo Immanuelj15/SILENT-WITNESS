@@ -154,18 +154,31 @@ class WebSocketClientManager(
         val timeStr = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
 
         val (threatLevel, riskScore, scamType, directives, explanation) = when {
-            listOf("digital arrest", "mumbai police", "cbi", "cyber crime", "narcotics", "arrest warrant", "cannot hang up", "stay on video").any { lower.contains(it) } -> {
+            listOf("digital arrest", "mumbai police", "police department calling", "police department", "cbi court order", "cbi", "cyber crime", "narcotics", "arrest warrant", "cannot hang up", "stay on video", "do not cut this video call").any { lower.contains(it) } -> {
                 Tuple5(
-                    "CRITICAL",
+                    "CRITICAL_ATTACK_DETECTED",
                     96,
                     "Digital Arrest / Law Enforcement Extortion",
                     listOf(
-                        "CRITICAL: Digital arrest does NOT exist in Indian or international law.",
-                        "Police, CBI, and Customs NEVER conduct arrests over video/phone calls.",
-                        "Do NOT transfer funds for 'verification' or security clearance.",
-                        "Terminate call immediately and dial Cyber Crime Helpline 1930."
+                        "POLICE NEVER CONDUCT INQUIRY ON WHATSAPP",
+                        "CRITICAL: Digital arrest does NOT exist under Indian law.",
+                        "Police, CBI, and Customs NEVER conduct arrests over video or phone calls.",
+                        "Do NOT transfer funds for 'verification' or security clearance."
                     ),
                     "On-device engine: Suspected law enforcement impersonation and digital arrest extortion."
+                )
+            }
+            listOf("otp", "tell me your otp", "verification code", "bank account details", "bank details", "one time password", "kyc", "account blocked", "pan card expired", "share otp", "verify otp", "cvv", "bank account").any { lower.contains(it) } -> {
+                Tuple5(
+                    "CRITICAL",
+                    95,
+                    "Financial OTP / Credential Harvesting Theft",
+                    listOf(
+                        "CRITICAL: DO NOT SHARE OTP - BANK OFFICIALS NEVER ASK FOR PASSWORDS",
+                        "NEVER read out 4-digit or 6-digit codes received via SMS",
+                        "Hang up and call the number printed on your debit card immediately"
+                    ),
+                    "On-device engine: Live dialogue detected urgent demand for one-time passwords (OTP) or bank credentials."
                 )
             }
             listOf("anydesk", "teamviewer", "rustdesk", "quicksupport", "screen share", "share screen", "9 digit code", "download quicksupport").any { lower.contains(it) } -> {
@@ -194,20 +207,6 @@ class WebSocketClientManager(
                         "Disconnect immediately and report to 1930."
                     ),
                     "On-device engine: Extortion falsely alleging consignment seizure and demanding clearance fee."
-                )
-            }
-            listOf("otp", "one time password", "kyc", "account blocked", "pan card expired", "share otp", "verify otp", "cvv").any { lower.contains(it) } -> {
-                Tuple5(
-                    "HIGH",
-                    88,
-                    "Financial OTP / KYC Expiration Scam",
-                    listOf(
-                        "HIGH RISK: Banks and service providers NEVER demand OTPs over phone calls.",
-                        "Do NOT read out the 4-digit or 6-digit OTP received via SMS.",
-                        "Legitimate organizations do not suspend accounts without formal notice.",
-                        "Call the official number printed on the back of your debit card."
-                    ),
-                    "On-device engine: Urgent pressure detected demanding 2FA credentials or KYC renewal."
                 )
             }
             else -> {
@@ -256,10 +255,40 @@ class WebSocketClientManager(
         webSocket?.send(json)
     }
 
+    init {
+        try {
+            val app = com.silentwitness.SilentWitnessApp.instance
+            val existing = com.silentwitness.evidence.EvidenceLedgerService.getAllDossiers(app)
+            if (existing.isNotEmpty()) {
+                _auditHistory.value = existing.map { d ->
+                    ThreatVerdict(
+                        threatLevel = d.threatLevel,
+                        compositeRisk = d.riskScore / 100f,
+                        identifiedScamType = d.scamClassification,
+                        liveCoachingDirectives = d.directives,
+                        auditHash = d.merkleHash,
+                        timestamp = d.timestampIst,
+                        maskedTranscript = d.sanitizedTranscript,
+                        riskScore = d.riskScore,
+                        explanation = "Certified Incident: ${d.incidentId}"
+                    )
+                }
+            }
+        } catch (e: Throwable) {
+            // ignore if app instance not ready yet
+        }
+    }
+
     fun recordProof(verdict: ThreatVerdict) {
         val currentList = _auditHistory.value.toMutableList()
         currentList.add(0, verdict)
         _auditHistory.value = currentList
+        try {
+            val app = com.silentwitness.SilentWitnessApp.instance
+            com.silentwitness.evidence.EvidenceLedgerService.recordIncident(app, verdict)
+        } catch (e: Throwable) {
+            Log.w(TAG, "Notice recording certified dossier: ${e.message}")
+        }
     }
 
     fun injectLocalVerdict(verdict: ThreatVerdict) {
@@ -275,5 +304,11 @@ class WebSocketClientManager(
 
     fun clearAuditHistory() {
         _auditHistory.value = emptyList()
+        try {
+            val app = com.silentwitness.SilentWitnessApp.instance
+            com.silentwitness.evidence.EvidenceLedgerService.clearAll(app)
+        } catch (e: Throwable) {
+            // ignore
+        }
     }
 }

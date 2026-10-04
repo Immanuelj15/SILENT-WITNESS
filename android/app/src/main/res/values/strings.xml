@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Silent Witness</string>
+    <string name="accessibility_service_description">Silent Witness AI Telephony Shield actively detects incoming WhatsApp, Telegram, and VoIP fraud calls to display live scam warnings and prevent unauthorized financial coercion.</string>
 </resources>

@@ -65,6 +65,26 @@
                 android:value="Real-time scam alert overlay during phone calls" />
         </service>
 
+        <!-- OTT / VoIP Call Accessibility Interception Service -->
+        <service
+            android:name=".accessibility.CallAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Live Audio Recording & Speech Forensics Foreground Service -->
+        <service
+            android:name=".audio.AudioRecordingService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
         <!-- OTT Audio Stream Capture Foreground Service -->
         <service
             android:name=".audio.OttAudioCaptureService"

@@ -60,16 +60,18 @@ class MockLLMService:
 
         # 3. Digital Arrest / Police / CBI Impersonation
         digital_arrest_triggers = [
-            "digital arrest", "mumbai police", "cyber crime", "cbi", "ed officer",
-            "narcotics", "arrest warrant", "illegal parcel", "passport seized",
-            "drugs found", "cannot hang up", "stay on video", "supreme court order"
+            "digital arrest", "mumbai police", "police department calling", "police department",
+            "cbi court order", "cbi", "cyber crime", "ed officer", "narcotics", "arrest warrant",
+            "illegal parcel", "passport seized", "drugs found", "cannot hang up", "stay on video",
+            "do not cut this video call", "supreme court order"
         ]
         if any(term in text_lower for term in digital_arrest_triggers):
             return {
-                "threat_level": "CRITICAL",
+                "threat_level": "CRITICAL_ATTACK_DETECTED",
                 "composite_risk": 0.96,
                 "identified_scam_type": "Digital Arrest / Law Enforcement Extortion",
                 "live_coaching_directives": [
+                    "POLICE NEVER CONDUCT INQUIRY ON WHATSAPP",
                     "CRITICAL: Digital arrest does NOT exist in Indian or international law.",
                     "Police, CBI, and Customs NEVER conduct arrests or court proceedings via WhatsApp/VoIP.",
                     "Do NOT transfer any funds for 'verification' or 'security clearance'.",
@@ -104,21 +106,21 @@ class MockLLMService:
 
         # 5. Financial OTP / KYC Expiration Scams
         financial_otp_triggers = [
-            "otp", "one time password", "kyc", "account blocked", "account will be blocked",
+            "otp", "tell me your otp", "verification code", "bank account details", "bank details",
+            "bank account", "one time password", "kyc", "account blocked", "account will be blocked",
             "pan card expired", "share otp", "verify otp", "cvv", "card expiry", "sbi kyc", "sim block"
         ]
         if any(term in text_lower for term in financial_otp_triggers):
             return {
-                "threat_level": "HIGH",
-                "composite_risk": 0.88,
-                "identified_scam_type": "Financial OTP / KYC Expiration Scam",
+                "threat_level": "CRITICAL",
+                "composite_risk": 0.95,
+                "identified_scam_type": "Financial OTP / Credential Harvesting Theft",
                 "live_coaching_directives": [
-                    "HIGH RISK: Banks and service providers NEVER demand OTPs or passwords over phone calls.",
-                    "Do NOT read out the 4-digit or 6-digit OTP received via SMS.",
-                    "Legitimate organizations do not suspend accounts within hours without written notice.",
-                    "Check your official bank app or call the number printed on your debit card."
+                    "CRITICAL: DO NOT SHARE OTP - BANK OFFICIALS NEVER ASK FOR PASSWORDS",
+                    "NEVER read out 4-digit or 6-digit codes received via SMS",
+                    "Hang up and call the number printed on your debit card immediately"
                 ],
-                "explanation": "Urgent pressure detected demanding 2FA credentials under the false pretext of account suspension or KYC renewal.",
+                "explanation": "Urgent pressure detected demanding 2FA credentials or bank account details.",
                 "is_mock": True,
                 "provider": "MockLLMService"
             }

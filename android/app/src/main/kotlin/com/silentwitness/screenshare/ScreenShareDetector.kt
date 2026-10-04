@@ -95,18 +95,52 @@ class ScreenShareDetector(private val context: Context) {
         return foundTools
     }
 
+    fun checkActiveRemotePackages(): List<String> {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+        val runningTools = mutableListOf<String>()
+        val processes = am?.runningAppProcesses ?: return emptyList()
+
+        for (proc in processes) {
+            for (pkg in proc.pkgList) {
+                if (SUSPICIOUS_PACKAGES.containsKey(pkg)) {
+                    runningTools.add(SUSPICIOUS_PACKAGES[pkg] ?: pkg)
+                }
+            }
+        }
+        return runningTools
+    }
+
+    fun checkAndBroadcastScreenShareThreat(): Boolean {
+        val screenCaptureActive = isScreenCaptureActive()
+        val activeTools = checkActiveRemotePackages()
+
+        if (screenCaptureActive || activeTools.isNotEmpty()) {
+            val reason = if (screenCaptureActive) {
+                "CRITICAL WARNING: SCREEN SHARING ACTIVE - SCAMMER CAN VIEW YOUR BANK DETAILS & PASSWORDS"
+            } else {
+                "CRITICAL WARNING: ACTIVE REMOTE DESKTOP APP DETECTED (${activeTools.joinToString()}) - CLOSE IMMEDIATELY"
+            }
+            broadcastScreenShareAlert(reason)
+            return true
+        }
+        return false
+    }
+
     fun evaluateContext(snippet: String): DetectionResult {
         val lower = snippet.lowercase()
         val matchedTriggers = DANGEROUS_TRIGGERS.filter { lower.contains(it) }
         val installedTools = checkInstalledRemoteTools()
+        val activeTools = checkActiveRemotePackages()
         val screenCaptureActive = isScreenCaptureActive()
 
-        val isThreat = screenCaptureActive || matchedTriggers.isNotEmpty() || (installedTools.isNotEmpty() && (lower.contains("open") || lower.contains("download")))
+        val isThreat = screenCaptureActive || activeTools.isNotEmpty() || matchedTriggers.isNotEmpty() || (installedTools.isNotEmpty() && (lower.contains("open") || lower.contains("download")))
 
         if (isThreat) {
             val warning = when {
                 screenCaptureActive ->
-                    "CRITICAL: Unauthorized screen-share or display mirroring session is active! Scammers can view your screen."
+                    "CRITICAL WARNING: SCREEN SHARING ACTIVE - SCAMMER CAN VIEW YOUR BANK DETAILS & PASSWORDS"
+                activeTools.isNotEmpty() ->
+                    "CRITICAL WARNING: ACTIVE REMOTE APP (${activeTools.joinToString()}) - SCAMMER CAN VIEW PASSWORDS"
                 matchedTriggers.contains("anydesk") || matchedTriggers.contains("teamviewer") ->
                     "CRITICAL: Caller requested Remote Desktop software. NEVER install or launch AnyDesk/TeamViewer!"
                 matchedTriggers.contains("share screen") || matchedTriggers.contains("start sharing") ->

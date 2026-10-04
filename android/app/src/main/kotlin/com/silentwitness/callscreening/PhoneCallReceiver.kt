@@ -31,21 +31,37 @@ class PhoneCallReceiver : BroadcastReceiver() {
         when (state) {
             TelephonyManager.EXTRA_STATE_RINGING,
             TelephonyManager.EXTRA_STATE_OFFHOOK -> {
-                Log.i(TAG, "Active call detected ($state). Arming Guardian Overlay and WebSocket.")
+                Log.i(TAG, "Active call detected ($state). Arming Guardian Overlay, Audio Forensics, and WebSocket.")
                 // 1. Ensure WebSocket connection is active
                 WebSocketClientManager.instance.connect()
 
                 // 2. Launch Guardian Overlay Service
                 if (Settings.canDrawOverlays(context)) {
-                    GuardianOverlayService.startService(context)
+                    GuardianOverlayService.startService(
+                        context = context,
+                        callerNumber = incomingNumber,
+                        callType = "Cellular Inbound"
+                    )
                 } else {
                     Log.w(TAG, "Cannot launch overlay: SYSTEM_ALERT_WINDOW permission pending.")
+                }
+
+                // 3. Launch Foreground Audio Recording & Live OTP Detection Service
+                try {
+                    com.silentwitness.audio.AudioRecordingService.startService(context)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error starting AudioRecordingService: ${e.message}")
                 }
             }
 
             TelephonyManager.EXTRA_STATE_IDLE -> {
-                Log.i(TAG, "Call ended (IDLE). Resetting Guardian Overlay.")
+                Log.i(TAG, "Call ended (IDLE). Resetting Guardian Overlay and Audio Forensics.")
                 GuardianOverlayService.stopService(context)
+                try {
+                    com.silentwitness.audio.AudioRecordingService.stopService(context)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error stopping AudioRecordingService: ${e.message}")
+                }
             }
         }
     }

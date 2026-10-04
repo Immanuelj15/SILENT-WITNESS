@@ -38,13 +38,46 @@ class MainActivity : ComponentActivity() {
     private val viewModel: GuardianViewModel by viewModels()
     private val activeTabState = mutableStateOf(NavigationTab.SHIELD)
 
+    private val callScreeningLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) {
+        viewModel.checkPermissions(this)
+    }
+
+    fun launchCallScreeningRole() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(android.app.role.RoleManager::class.java)
+            if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_CALL_SCREENING)) {
+                if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_CALL_SCREENING)) {
+                    val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_CALL_SCREENING)
+                    callScreeningLauncher.launch(intent)
+                } else {
+                    viewModel.checkPermissions(this)
+                }
+            }
+        } else {
+            val intent = Intent(android.telecom.TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
+                putExtra(android.telecom.TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
+            }
+            try {
+                callScreeningLauncher.launch(intent)
+            } catch (e: Exception) {
+                android.util.Log.w("MainActivity", "Pre-Q role request error: ${e.message}")
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleTabIntent(intent)
         WebSocketClientManager.instance.connect()
         setContent {
             SilentWitnessTheme {
-                MainScreen(viewModel, activeTabState)
+                MainScreen(
+                    viewModel = viewModel,
+                    tabState = activeTabState,
+                    onRequestCallScreening = { launchCallScreeningRole() }
+                )
             }
         }
     }
@@ -64,6 +97,21 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         viewModel.checkPermissions(this)
         WebSocketClientManager.instance.connect()
+
+        // Automatic system prompt for Call Screening role on Android Q+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val roleManager = getSystemService(android.app.role.RoleManager::class.java)
+            if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_CALL_SCREENING)) {
+                if (!roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_CALL_SCREENING)) {
+                    val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_CALL_SCREENING)
+                    try {
+                        callScreeningLauncher.launch(intent)
+                    } catch (e: Exception) {
+                        android.util.Log.w("MainActivity", "Role prompt: ${e.message}")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -77,7 +125,8 @@ enum class NavigationTab(val label: String) {
 @Composable
 fun MainScreen(
     viewModel: GuardianViewModel,
-    tabState: MutableState<NavigationTab> = remember { mutableStateOf(NavigationTab.SHIELD) }
+    tabState: MutableState<NavigationTab> = remember { mutableStateOf(NavigationTab.SHIELD) },
+    onRequestCallScreening: () -> Unit = {}
 ) {
     var selectedTab by tabState
     val context = LocalContext.current
@@ -189,7 +238,11 @@ fun MainScreen(
                 .padding(paddingValues)
         ) {
             when (selectedTab) {
-                NavigationTab.SHIELD -> ShieldOverviewScreen(viewModel, onNavigateToEvidence = { selectedTab = NavigationTab.EVIDENCE })
+                NavigationTab.SHIELD -> ShieldOverviewScreen(
+                    viewModel = viewModel,
+                    onNavigateToEvidence = { selectedTab = NavigationTab.EVIDENCE },
+                    onRequestCallScreening = onRequestCallScreening
+                )
                 NavigationTab.SCAM_LAB -> ScamLabScreen(viewModel)
                 NavigationTab.EVIDENCE -> EvidenceHistoryScreen(viewModel)
             }
@@ -200,12 +253,14 @@ fun MainScreen(
 @Composable
 fun ShieldOverviewScreen(
     viewModel: GuardianViewModel,
-    onNavigateToEvidence: () -> Unit = {}
+    onNavigateToEvidence: () -> Unit = {},
+    onRequestCallScreening: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val isArmed by viewModel.isShieldArmed.collectAsState()
     val hasOverlay by viewModel.hasOverlayPermission.collectAsState()
     val hasScreening by viewModel.hasCallScreeningRole.collectAsState()
+    val hasAccessibility by viewModel.hasAccessibilityPermission.collectAsState()
     val installedTools by viewModel.installedRemoteTools.collectAsState()
     val connState by viewModel.connectionState.collectAsState()
     val latestVerdict by viewModel.latestVerdict.collectAsState()
@@ -573,7 +628,7 @@ fun ShieldOverviewScreen(
 
                     if (!hasScreening) {
                         Button(
-                            onClick = { viewModel.requestCallScreeningRole(context) },
+                            onClick = onRequestCallScreening,
                             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
                             shape = RoundedCornerShape(8.dp)
@@ -585,14 +640,92 @@ fun ShieldOverviewScreen(
                             color = ThreatSafeBg,
                             shape = RoundedCornerShape(6.dp)
                         ) {
-                            Text("Active", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = ThreatSafe, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Active",
+                                    tint = ThreatSafe,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Active",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ThreatSafe
+                                )
+                            }
                         }
                     }
                 }
 
                 Divider(color = BorderColor)
 
-                // 3. Remote Tool Scanner Status
+                // 3. WhatsApp / VoIP Accessibility Service
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f).padding(end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (hasAccessibility) Icons.Default.CheckCircle else Icons.Default.Warning,
+                            contentDescription = "Accessibility status",
+                            tint = if (hasAccessibility) ThreatSafe else ThreatWarning,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text("WhatsApp / VoIP Interceptor", fontWeight = FontWeight.Bold, fontSize = 13.5.sp, color = Slate900)
+                            Text("Accessibility service for video & voice calls", fontSize = 11.5.sp, color = Slate500)
+                        }
+                    }
+
+                    if (!hasAccessibility) {
+                        Button(
+                            onClick = { viewModel.requestAccessibilityPermission(context) },
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Enable", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, softWrap = false)
+                        }
+                    } else {
+                        Surface(
+                            color = ThreatSafeBg,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = "Active",
+                                    tint = ThreatSafe,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Active",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ThreatSafe
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Divider(color = BorderColor)
+
+                // 4. Remote Tool Scanner Status
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,

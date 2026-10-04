@@ -64,6 +64,8 @@ class GuardianOverlayService : Service() {
         const val ACTION_SIMULATE_ALERT = "com.silentwitness.action.SIMULATE_ALERT"
         const val EXTRA_THREAT_TYPE = "extra_threat_type"
         const val EXTRA_MESSAGE = "extra_message"
+        const val EXTRA_CALLER_NUMBER = "extra_caller_number"
+        const val EXTRA_CALL_TYPE = "extra_call_type"
         private const val NOTIFICATION_ID = 9001
 
         // Color Palettes
@@ -71,15 +73,13 @@ class GuardianOverlayService : Service() {
         const val COLOR_CAUTION_AMBER = "#F59E0B"   // Manja (Caution)
         const val COLOR_CRITICAL_RED = "#EF4444"    // Chuvappu (Critical)
 
-        fun startService(context: Context) {
+        fun startService(context: Context, callerNumber: String? = null, callType: String? = null) {
             val intent = Intent(context, GuardianOverlayService::class.java).apply {
                 action = ACTION_START
+                if (!callerNumber.isNullOrBlank()) putExtra(EXTRA_CALLER_NUMBER, callerNumber)
+                if (!callType.isNullOrBlank()) putExtra(EXTRA_CALL_TYPE, callType)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            androidx.core.content.ContextCompat.startForegroundService(context, intent)
         }
 
         fun stopService(context: Context) {
@@ -116,11 +116,11 @@ class GuardianOverlayService : Service() {
                 triggerCriticalHapticFeedback()
                 showOverlay(
                     tier = ThreatTier.CRITICAL,
-                    bannerTitle = "🚨 CRITICAL: DO NOT SHARE OTP / REMOTE ACCESS DETECTED",
+                    bannerTitle = "🚨 CRITICAL WARNING: SCREEN SHARING ACTIVE - SCAMMER CAN VIEW YOUR BANK DETAILS & PASSWORDS",
                     directives = listOf(
-                        "DO NOT INSTALL REMOTE APPS",
-                        "DO NOT SHARE OTP OR PASSWORDS",
-                        "Scammers can see your screen and banking credentials."
+                        "CRITICAL: Remote screen sharing is active.",
+                        "Scammer can view bank accounts, passwords, and OTPs.",
+                        "Terminate call immediately and disconnect remote desktop apps."
                     ),
                     riskScore = 98
                 )
@@ -137,6 +137,7 @@ class GuardianOverlayService : Service() {
 
         startForegroundNotification("Guardian Active", "Monitoring ongoing communication for scam threats")
         observeThreatVerdicts()
+        startScreenSharePolling()
 
         try {
             val filter = IntentFilter(ScreenShareDetector.ACTION_SCREEN_SHARE_DETECTED)
@@ -147,6 +148,20 @@ class GuardianOverlayService : Service() {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Notice registering screenShareReceiver: ${e.message}")
+        }
+    }
+
+    private fun startScreenSharePolling() {
+        val detector = ScreenShareDetector(this)
+        serviceScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                try {
+                    detector.checkAndBroadcastScreenShareThreat()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Notice polling screen share state: ${e.message}")
+                }
+                delay(2500)
+            }
         }
     }
 
@@ -168,14 +183,22 @@ class GuardianOverlayService : Service() {
                 simulateThreat(threatType, customMsg)
             }
             ACTION_START -> {
-                Log.i(TAG, "Guardian Overlay Service running in foreground")
+                val callerNumber = intent?.getStringExtra(EXTRA_CALLER_NUMBER)
+                val callType = intent?.getStringExtra(EXTRA_CALL_TYPE) ?: "Active Call"
+                val displayTitle = if (!callerNumber.isNullOrBlank()) {
+                    "🛡️ GUARDIAN SHIELD: $callerNumber ($callType)"
+                } else {
+                    "🛡️ GUARDIAN SHIELD ACTIVE - MONITORING CALL"
+                }
+
+                Log.i(TAG, "Guardian Overlay Service running in foreground ($displayTitle)")
                 if (!isOverlayVisible) {
                     showOverlay(
                         tier = ThreatTier.SAFE,
-                        bannerTitle = "🛡️ GUARDIAN SHIELD ACTIVE - MONITORING CALL",
+                        bannerTitle = displayTitle,
                         directives = listOf(
-                            "Silent Witness active over active call.",
-                            "Real-time AI scam detection running."
+                            "Silent Witness active over $callType.",
+                            "Real-time AI scam & coercion detection running."
                         ),
                         riskScore = 5
                     )
@@ -227,8 +250,10 @@ class GuardianOverlayService : Service() {
         when {
             threatLevel == "CRITICAL" || threatLevel == "CRITICAL_ATTACK_DETECTED" || riskScore >= 80 -> {
                 triggerCriticalHapticFeedback()
-                val title = if (scamType.contains("Digital Arrest", ignoreCase = true)) {
-                    "🚨 SUSPECTED DIGITAL ARREST - LAW ENFORCEMENT DOES NOT USE WHATSAPP"
+                val title = if (scamType.contains("Digital Arrest", ignoreCase = true) || directives.any { it.contains("POLICE NEVER", ignoreCase = true) }) {
+                    "🚨 POLICE NEVER CONDUCT INQUIRY ON WHATSAPP"
+                } else if (scamType.contains("OTP", ignoreCase = true) || directives.any { it.contains("DO NOT SHARE OTP", ignoreCase = true) }) {
+                    "🚨 CRITICAL: DO NOT SHARE OTP - BANK OFFICIALS NEVER ASK FOR PASSWORDS"
                 } else {
                     "🚨 CRITICAL SCAM DETECTED: DO NOT SHARE OTP / REMOTE ACCESS APP"
                 }
@@ -362,11 +387,11 @@ class GuardianOverlayService : Service() {
                     WindowManager.LayoutParams.TYPE_PHONE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
+                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                y = 50
+                y = 40
             }
 
             val rootLayout = buildOverlayView(tier, bannerTitle, directives, riskScore)
@@ -555,8 +580,8 @@ class GuardianOverlayService : Service() {
         // 1. MUTE AUDIO Button
         val isMuted = audioManager?.isMicrophoneMute == true
         val muteButton = Button(this).apply {
-            text = if (isMuted) "UNMUTE" else "MUTE AUDIO"
-            textSize = 11f
+            text = if (isMuted) "UNMUTE" else "MUTE"
+            textSize = 10.5f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             background = GradientDrawable().apply {
@@ -574,10 +599,10 @@ class GuardianOverlayService : Service() {
         muteButtonRef = muteButton
         actionsRow.addView(muteButton)
 
-        // 2. TERMINATE CALL Button
+        // 2. DISCONNECT CALL Button
         val terminateButton = Button(this).apply {
-            text = "TERMINATE"
-            textSize = 11f
+            text = "DISCONNECT"
+            textSize = 10.5f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
             background = GradientDrawable().apply {
@@ -594,9 +619,9 @@ class GuardianOverlayService : Service() {
         }
         actionsRow.addView(terminateButton)
 
-        // 3. SAVE EVIDENCE Button
+        // 3. SAVE PROOF Button
         val saveEvidenceButton = Button(this).apply {
-            text = "SAVE EVIDENCE"
+            text = "SAVE PROOF"
             textSize = 10.5f
             setTextColor(Color.WHITE)
             typeface = Typeface.DEFAULT_BOLD
@@ -635,6 +660,17 @@ class GuardianOverlayService : Service() {
     }
 
     private fun terminateActiveCall() {
+        // 1. Terminate WhatsApp / Telegram OTT calls via CallAccessibilityService
+        try {
+            val ottEnded = com.silentwitness.accessibility.CallAccessibilityService.instance?.terminateOttCall() == true
+            if (ottEnded) {
+                Log.i(TAG, "Active OTT call terminated via CallAccessibilityService")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice terminating OTT call via accessibility: ${e.message}")
+        }
+
+        // 2. Terminate Cellular SIM calls via TelecomManager
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
@@ -644,7 +680,7 @@ class GuardianOverlayService : Service() {
             }
             Toast.makeText(this, "Call terminated by Silent Witness Guardian", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            Log.w(TAG, "Notice terminating call: ${e.message}")
+            Log.w(TAG, "Notice terminating cellular call: ${e.message}")
         }
         saveEvidenceToLedger()
         hideOverlay()
